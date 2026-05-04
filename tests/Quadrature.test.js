@@ -1,0 +1,88 @@
+import {describe, it, expect} from 'vitest';
+import {
+  integrateTriangle,
+  integrateTetrahedron,
+  barycentricToCartesian,
+  lineQuadrature,
+} from '../src/lib/quadrature.js';
+
+describe('Quadrature', () => {
+  it('triangle order 1 integrates constants exactly', () => {
+    const verts = [[0, 0, 0], [1, 0, 0], [0, 1, 0]];
+    const result = integrateTriangle(verts, () => 1, 1);
+    expect(result).toBeCloseTo(0.5, 10);
+  });
+
+  it('triangle order 2 integrates linear functions exactly', () => {
+    const verts = [[0, 0, 0], [1, 0, 0], [0, 1, 0]];
+    const result = integrateTriangle(verts, (pt) => pt[0] + pt[1], 2);
+    expect(result).toBeCloseTo(1 / 3, 10);
+  });
+
+  it('triangle order 3 integrates quadratics exactly', () => {
+    const verts = [[0, 0, 0], [1, 0, 0], [0, 1, 0]];
+    const result = integrateTriangle(verts, (pt) => pt[0] * pt[0], 3);
+    expect(result).toBeCloseTo(1 / 12, 10);
+  });
+
+  it('tetrahedron order 1 integrates constants exactly', () => {
+    const verts = [[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]];
+    const result = integrateTetrahedron(verts, () => 1, 1);
+    expect(result).toBeCloseTo(1 / 6, 10);
+  });
+
+  it('tetrahedron order 2 integrates linear functions exactly', () => {
+    const verts = [[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]];
+    const result = integrateTetrahedron(
+      verts,
+      (pt) => pt[0] + pt[1] + pt[2],
+      2,
+    );
+    expect(result).toBeCloseTo(1 / 8, 10);
+  });
+
+  it('tetrahedron order 3 integrates quadratics exactly', () => {
+    const verts = [[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]];
+    const result = integrateTetrahedron(
+      verts,
+      (pt) => pt[0] * pt[0] + pt[1] * pt[1] + pt[2] * pt[2],
+      3,
+    );
+    expect(result).toBeCloseTo(1 / 20, 10);
+  });
+
+  it('barycentricToCartesian works for triangle', () => {
+    const verts = [[0, 0, 0], [1, 0, 0], [0, 1, 0]];
+    const pt = barycentricToCartesian(verts, [0.5, 0.5, 0]);
+    expect(pt[0]).toBeCloseTo(0.5, 10);
+    expect(pt[1]).toBeCloseTo(0, 10);
+    expect(pt[2]).toBeCloseTo(0, 10);
+  });
+
+  it('lineQuadrature order 1 integrates constants exactly', () => {
+    const {points, weights} = lineQuadrature(1);
+    let sum = 0;
+    for (let q = 0; q < points.length; q++) {
+      sum += weights[q] * 1;
+    }
+    expect(sum).toBeCloseTo(1, 10);
+  });
+
+  it('lineQuadrature order 2 integrates linear functions exactly', () => {
+    const {points, weights} = lineQuadrature(2);
+    let sum = 0;
+    for (let q = 0; q < points.length; q++) {
+      sum += weights[q] * points[q];
+    }
+    expect(sum).toBeCloseTo(0.5, 10);
+  });
+
+  it('lineQuadrature order 3 integrates quadratics exactly', () => {
+    const {points, weights} = lineQuadrature(3);
+    let sum = 0;
+    for (let q = 0; q < points.length; q++) {
+      sum += weights[q] * points[q] * points[q];
+    }
+    expect(sum).toBeCloseTo(1 / 3, 10);
+  });
+});
