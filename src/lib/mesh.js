@@ -12,17 +12,31 @@ function sort3(a, b, c) {
   return [a, b, c];
 }
 
+import {triangleArea} from './math_utils.js';
+
 /**
- * Tetrahedral mesh with topological connectivity, boundary extraction,
- * Alfeld face splitting, and Worsey-Farin tetrahedron splitting.
+ * Tetrahedral mesh data structure with topological connectivity and boundary
+ * extraction.  This class is intentionally a *pure data structure*; mesh
+ * refinement operators (Alfeld split, Worsey-Farin split) live in
+ * {@link MeshRefinement}.
  */
 
 export class Mesh {
+  /** @type {!Map<number, number>} */
+  #edgeKeyToIndex;
+  /** @type {!Map<number, number>} */
+  #faceKeyToIndex;
+  /** @type {!Array<!Array<number>>} */
+  #tetEdgeSigns;
+  /** @type {!Array<!Array<number>>} */
+  #tetFaceSigns;
+
   /**
    * @param {!Array<!Array<number>>} vertices - Vertex coordinates.
    * @param {!Array<!Array<number>>} tetrahedra - Tetrahedron vertex indices.
    */
   constructor(vertices, tetrahedra) {
+    Mesh.#validateInput(vertices, tetrahedra);
     this.vertices = vertices;
     this.tetrahedra = tetrahedra;
     this.originalVertexCount = vertices.length;
@@ -37,33 +51,107 @@ export class Mesh {
 
     this.faceToTets = [];
     this.edgeToFaces = [];
-    /** @type {!Map<number, number>} Maps edge integer key to global edge index. */
-    this.edgeKeyToIndex = new Map();
 
     this.vertexToTets = [];
     this.vertexToBoundaryFaces = [];
     this.vertexToEdges = [];
 
-    /**
-     * Orientation signs for edges within each tetrahedron.
-     * tetEdgeSigns[tIdx][e] = +1 if local edge order matches global storage, -1 otherwise.
-     * @type {!Array<!Array<number>>}
-     */
-    this.tetEdgeSigns = [];
-    /**
-     * Orientation signs for faces within each tetrahedron.
-     * tetFaceSigns[tIdx][f] = +1 if local face is an even permutation of storage, -1 otherwise.
-     * @type {!Array<!Array<number>>}
-     */
-    this.tetFaceSigns = [];
+    this.#edgeKeyToIndex = new Map();
+    this.#faceKeyToIndex = new Map();
+    this.#tetEdgeSigns = [];
+    this.#tetFaceSigns = [];
 
     this.#buildTopology();
     this.#computeOrientationSigns();
+  }
 
-    this.faceBarycenters = [];
-    this.tetBarycenters = [];
-    this.alfeldTriangles = [];
-    this.worseyFarinTetrahedra = [];
+  /**
+   * Validates mesh input before construction.
+   * @param {!Array<!Array<number>>} vertices
+   * @param {!Array<!Array<number>>} tetrahedra
+   * @private
+   */
+  static #validateInput(vertices, tetrahedra) {
+    if (!Array.isArray(vertices) || vertices.length === 0) {
+      throw new Error('vertices must be a non-empty array');
+    }
+    if (!Array.isArray(tetrahedra) || tetrahedra.length === 0) {
+      throw new Error('tetrahedra must be a non-empty array');
+    }
+    for (let i = 0; i < vertices.length; i++) {
+      const v = vertices[i];
+      if (!Array.isArray(v) || v.length !== 3 || !v.every((n) => typeof n === 'number' && Number.isFinite(n))) {
+        throw new Error(`Vertex ${i} must be an array of 3 finite numbers`);
+      }
+    }
+    for (let i = 0; i < tetrahedra.length; i++) {
+      const t = tetrahedra[i];
+      if (!Array.isArray(t) || t.length !== 4 || !t.every((n) => typeof n === 'number' && Number.isInteger(n))) {
+        throw new Error(`Tetrahedron ${i} must be an array of 4 integer indices`);
+      }
+      for (let j = 0; j < 4; j++) {
+        if (t[j] < 0 || t[j] >= vertices.length) {
+          throw new Error(
+            `Tetrahedron ${i} contains out-of-bounds vertex index ${t[j]} (valid range: 0-${vertices.length - 1})`,
+          );
+        }
+      }
+      if (new Set(t).size !== 4) {
+        throw new Error(`Tetrahedron ${i} contains duplicate vertex indices`);
+      }
+    }
+  }
+
+  /**
+   * Returns the geometric area of a face.
+   * @param {number} fIdx
+   * @return {number}
+   */
+  getFaceArea(fIdx) {
+    const f = this.faces[fIdx];
+    return triangleArea(
+      this.vertices[f[0]],
+      this.vertices[f[1]],
+      this.vertices[f[2]],
+    );
+  }
+
+  /**
+   * Looks up the global edge index for an edge key.
+   * @param {number} edgeKey
+   * @return {number|undefined}
+   */
+  getEdgeIndex(edgeKey) {
+    return this.#edgeKeyToIndex.get(edgeKey);
+  }
+
+  /**
+   * Looks up the global face index for a face key.
+   * @param {number} faceKey
+   * @return {number|undefined}
+   */
+  getFaceIndex(faceKey) {
+    return this.#faceKeyToIndex.get(faceKey);
+  }
+
+  /**
+   * Returns the edge orientation sign for a local edge within a tetrahedron.
+   * @param {number} tIdx
+   * @param {number} e - Local edge index (0-5).
+   * @return {number}
+   */
+  getTetEdgeSign(tIdx, e) {
+    return this.#tetEdgeSigns[tIdx][e];
+  }
+
+  /**
+   * Returns the face orientation sign for a local face within a tetrahedron.
+   * @param {number} tIdx
+   * @param {number} f - Local face index (0-3).
+   * @return {number}
+   */
+  getTetFaceSign(tIdx, f) {
+    return this.#tetFaceSigns[tIdx][f];
   }
 
   /** @private */
@@ -97,13 +185,11 @@ export class Mesh {
       }
     }
 
-    this.faceKeyToIndex = new Map();
-
     let fIdx = 0;
     for (const [key, data] of faceMap.entries()) {
       this.faces.push(data.verts);
       this.faceToTets.push(data.tets);
-      this.faceKeyToIndex.set(key, fIdx);
+      this.#faceKeyToIndex.set(key, fIdx);
 
       const isBoundary = data.tets.length === 1;
       if (isBoundary) {
@@ -136,7 +222,7 @@ export class Mesh {
     for (const [key, data] of edgeMap.entries()) {
       this.edges.push(data.verts);
       this.edgeToFaces.push(data.faces);
-      this.edgeKeyToIndex.set(key, eIdx);
+      this.#edgeKeyToIndex.set(key, eIdx);
       if (data.isBoundary) {
         this.boundaryEdges.push(eIdx);
       }
@@ -168,8 +254,6 @@ export class Mesh {
 
   /**
    * Computes orientation signs for edges and faces within each tetrahedron.
-   * tetEdgeSigns[tIdx][e] = +1 if local edge order matches global storage.
-   * tetFaceSigns[tIdx][f] = +1 if local face is an even permutation of storage.
    * @private
    */
   #computeOrientationSigns() {
@@ -179,17 +263,17 @@ export class Mesh {
       return a < b ? a * this.originalVertexCount + b : b * this.originalVertexCount + a;
     };
 
-    this.tetEdgeSigns = new Array(this.tetrahedronCount);
-    this.tetFaceSigns = new Array(this.tetrahedronCount);
+    this.#tetEdgeSigns = new Array(this.tetrahedronCount);
+    this.#tetFaceSigns = new Array(this.tetrahedronCount);
 
     for (let tIdx = 0; tIdx < this.tetrahedronCount; tIdx++) {
       const tet = this.tetrahedra[tIdx];
 
       const edges = [[0, 1], [0, 2], [0, 3], [1, 2], [1, 3], [2, 3]];
-      this.tetEdgeSigns[tIdx] = edges.map(([i, j]) => {
+      this.#tetEdgeSigns[tIdx] = edges.map(([i, j]) => {
         const gEdge = [tet[i], tet[j]];
         const key = edgeKey(gEdge);
-        const gIdx = this.edgeKeyToIndex.get(key);
+        const gIdx = this.#edgeKeyToIndex.get(key);
         const stored = this.edges[gIdx];
         return stored[0] === gEdge[0] && stored[1] === gEdge[1] ? 1 : -1;
       });
@@ -200,9 +284,9 @@ export class Mesh {
         [tet[0], tet[1], tet[3]],
         [tet[0], tet[1], tet[2]],
       ];
-      this.tetFaceSigns[tIdx] = faces.map((f) => {
+      this.#tetFaceSigns[tIdx] = faces.map((f) => {
         const key = this.#faceKey(f);
-        const gIdx = this.faceKeyToIndex.get(key);
+        const gIdx = this.#faceKeyToIndex.get(key);
         const stored = this.faces[gIdx];
         return this.#facePermutationSign(stored, f);
       });
@@ -218,79 +302,15 @@ export class Mesh {
    */
   #facePermutationSign(stored, local) {
     const idx = local.map((v) => stored.indexOf(v));
-    // Parity of permutation (idx[0], idx[1], idx[2]) of (0,1,2).
-    // The sign of the permutation is the sign of the product of differences.
-    const inv = (idx[1] - idx[0]) * (idx[2] - idx[0]) * (idx[2] - idx[1]);
-    return inv > 0 ? 1 : -1;
-  }
-
-  /** Section 6.1.3: Alfeld split of boundary faces. */
-  computeAlfeldSplit() {
-    this.faceBarycenters = new Array(this.faces.length).fill(-1);
-    this.alfeldTriangles = [];
-
-    this.boundaryFaces.forEach((fIdx) => {
-      const f = this.faces[fIdx];
-      const bary = this.getFaceBarycenter(fIdx);
-      const vBaryIdx = this.vertices.length;
-      this.vertices.push(bary);
-      this.faceBarycenters[fIdx] = vBaryIdx;
-
-      const subTriangles = [
-        [f[0], f[1], vBaryIdx],
-        [f[1], f[2], vBaryIdx],
-        [f[2], f[0], vBaryIdx],
-      ];
-      this.alfeldTriangles.push({parentFaceIdx: fIdx, triangles: subTriangles});
-    });
-    this.vertexCount = this.vertices.length;
-  }
-
-  /** Section 6.1.4: Worsey-Farin split of tetrahedra. */
-  computeWorseyFarinSplit() {
-    if (this.faceBarycenters.length === 0) {
-      this.computeAlfeldSplit();
+    // Count inversions in the permutation (idx[0], idx[1], idx[2]) of (0,1,2).
+    // Even parity → +1, odd parity → -1.
+    let inversions = 0;
+    for (let i = 0; i < idx.length; i++) {
+      for (let j = i + 1; j < idx.length; j++) {
+        if (idx[i] > idx[j]) inversions++;
+      }
     }
-
-    this.tetBarycenters = new Array(this.tetrahedronCount).fill(-1);
-    this.worseyFarinTetrahedra = [];
-
-    for (let tIdx = 0; tIdx < this.tetrahedronCount; tIdx++) {
-      const tet = this.tetrahedra[tIdx];
-      const bary = this.getTetrahedronBarycenter(tIdx);
-      const vTetBaryIdx = this.vertices.length;
-      this.vertices.push(bary);
-      this.tetBarycenters[tIdx] = vTetBaryIdx;
-
-      const tetSubTets = [];
-      const tFaces = this.getTetrahedronFaces(tIdx);
-
-      tFaces.forEach((fIdx) => {
-        const f = this.faces[fIdx];
-        let fvBaryIdx = this.faceBarycenters[fIdx];
-        if (fvBaryIdx === -1) {
-          const fbary = this.getFaceBarycenter(fIdx);
-          fvBaryIdx = this.vertices.length;
-          this.vertices.push(fbary);
-          this.faceBarycenters[fIdx] = fvBaryIdx;
-        }
-
-        const subTris = [
-          [f[0], f[1], fvBaryIdx],
-          [f[1], f[2], fvBaryIdx],
-          [f[2], f[0], fvBaryIdx],
-        ];
-
-        subTris.forEach((tri) => {
-          tetSubTets.push([...tri, vTetBaryIdx]);
-        });
-      });
-      this.worseyFarinTetrahedra.push({
-        parentTetIdx: tIdx,
-        tetrahedra: tetSubTets,
-      });
-    }
-    this.vertexCount = this.vertices.length;
+    return inversions % 2 === 0 ? 1 : -1;
   }
 
   /**
@@ -378,7 +398,7 @@ export class Mesh {
     ];
     return local.map((lf) => {
       const key = this.#faceKey(lf);
-      return this.faceKeyToIndex.get(key);
+      return this.#faceKeyToIndex.get(key);
     });
   }
 

@@ -17,10 +17,11 @@ export class HigherOrderProjection {
    * @param {!Whitney} whitney
    * @param {number=} quadratureOrder
    */
-  constructor(mesh, whitney, quadratureOrder = 3) {
+  constructor(mesh, whitney, quadratureOrder = 3, onWarning = console.warn) {
     this.mesh = mesh;
     this.whitney = whitney;
     this.quadratureOrder = quadratureOrder;
+    this.onWarning = onWarning;
     this.bubbleExponentCache = new Map();
   }
 
@@ -54,6 +55,18 @@ export class HigherOrderProjection {
   }
 
   /**
+   * Polynomial power with explicit 0^0 = 1 convention.
+   * @param {number} base
+   * @param {number} exp
+   * @return {number}
+   * @private
+   */
+  static #pow(base, exp) {
+    if (base === 0 && exp === 0) return 1;
+    return Math.pow(base, exp);
+  }
+
+  /**
    * Evaluates the scalar bubble basis at a point given in barycentric coords.
    * @param {!Array<number>} bary
    * @param {number} p
@@ -65,10 +78,10 @@ export class HigherOrderProjection {
       return [];
     }
     return exponents.map(([a, b, c, d]) =>
-      Math.pow(bary[0], a) *
-      Math.pow(bary[1], b) *
-      Math.pow(bary[2], c) *
-      Math.pow(bary[3], d),
+      HigherOrderProjection.#pow(bary[0], a) *
+      HigherOrderProjection.#pow(bary[1], b) *
+      HigherOrderProjection.#pow(bary[2], c) *
+      HigherOrderProjection.#pow(bary[3], d),
     );
   }
 
@@ -151,7 +164,7 @@ export class HigherOrderProjection {
       const f = this.assembleBubbleRhs(tIdx, p, residualFn);
       return luSolve(M, f);
     } catch (e) {
-      console.warn(
+      this.onWarning(
         `HigherOrderProjection: bubble solve failed for tet ${tIdx}, p=${p}: ${e.message}`,
       );
       return null;
@@ -208,7 +221,9 @@ export class HigherOrderProjection {
     const l1 = bary[1];
     const l2 = bary[2];
     return exponents.map(([a, b, c]) =>
-      Math.pow(l0, a) * Math.pow(l1, b) * Math.pow(l2, c),
+      HigherOrderProjection.#pow(l0, a) *
+      HigherOrderProjection.#pow(l1, b) *
+      HigherOrderProjection.#pow(l2, c),
     );
   }
 

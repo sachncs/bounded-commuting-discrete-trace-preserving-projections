@@ -82,23 +82,6 @@ export function tetrahedronQuadrature(order) {
 }
 
 /**
- * Maps barycentric coordinates to a Cartesian point.
- * @param {!Array<!Array<number>>} vertices - Vertices of the element.
- * @param {!Array<number>} bary - Barycentric coordinates.
- * @return {!Array<number>}
- */
-export function barycentricToCartesian(vertices, bary) {
-  const dim = vertices[0].length;
-  const point = new Array(dim).fill(0);
-  for (let i = 0; i < vertices.length; i++) {
-    for (let d = 0; d < dim; d++) {
-      point[d] += bary[i] * vertices[i][d];
-    }
-  }
-  return point;
-}
-
-/**
  * Integrates a scalar function over a triangle using quadrature.
  * @param {!Array<!Array<number>>} vertices - Triangle vertices.
  * @param {function(!Array<number>): number} fn - Scalar function.
@@ -133,6 +116,23 @@ export function integrateTriangle(vertices, fn, order = 2) {
     sum += weights[i] * fn(point);
   }
   return area * sum;
+}
+
+/**
+ * Maps barycentric coordinates to a Cartesian point.
+ * @param {!Array<!Array<number>>} vertices - Vertices of the element.
+ * @param {!Array<number>} bary - Barycentric coordinates.
+ * @return {!Array<number>}
+ */
+export function barycentricToCartesian(vertices, bary) {
+  const dim = vertices[0].length;
+  const point = new Array(dim).fill(0);
+  for (let i = 0; i < vertices.length; i++) {
+    for (let d = 0; d < dim; d++) {
+      point[d] += bary[i] * vertices[i][d];
+    }
+  }
+  return point;
 }
 
 /**

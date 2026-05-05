@@ -53,6 +53,19 @@ export function norm(v) {
 }
 
 /**
+ * Computes the area of a triangle given its three vertices.
+ * @param {!Array<number>} p1
+ * @param {!Array<number>} p2
+ * @param {!Array<number>} p3
+ * @return {number}
+ */
+export function triangleArea(p1, p2, p3) {
+  const v1 = subtract(p2, p1);
+  const v2 = subtract(p3, p1);
+  return 0.5 * norm(cross(v1, v2));
+}
+
+/**
  * Creates a zero-initialized dense matrix.
  * @param {number} rows
  * @param {number} cols
@@ -63,7 +76,31 @@ export function zeros(rows, cols) {
 }
 
 /**
- * Solves Ax = b using Gaussian elimination with partial pivoting.
+ * Computes the infinity norm (maximum absolute row sum) of a matrix.
+ * @param {!Array<!Array<number>>} a
+ * @return {number}
+ */
+export function infinityNorm(a) {
+  const n = a.length;
+  let maxRowSum = 0;
+  for (let i = 0; i < n; i++) {
+    let sum = 0;
+    for (let j = 0; j < n; j++) {
+      sum += Math.abs(a[i][j]);
+    }
+    if (sum > maxRowSum) {
+      maxRowSum = sum;
+    }
+  }
+  return maxRowSum;
+}
+
+/**
+ * Solves Ax = b using Gaussian elimination with partial pivoting and row
+ * equilibration (pivot scaling).
+ *
+ * The matrix is scaled so that each row has max-norm 1 before elimination,
+ * reducing the risk of false singularity claims on poorly scaled systems.
  *
  * @param {!Array<!Array<number>>} a - Dense square matrix (not modified).
  * @param {!Array<number>} b
@@ -71,7 +108,23 @@ export function zeros(rows, cols) {
  */
 export function luSolve(a, b) {
   const n = a.length;
-  const aug = a.map((row, i) => [...row, b[i]]);
+
+  // Row equilibration: scale each row so its max element is 1.
+  const scale = new Array(n);
+  for (let i = 0; i < n; i++) {
+    let rowMax = 0;
+    for (let j = 0; j < n; j++) {
+      const val = Math.abs(a[i][j]);
+      if (val > rowMax) rowMax = val;
+    }
+    scale[i] = rowMax === 0 ? 1 : rowMax;
+  }
+
+  const aug = a.map((row, i) => [...row.map((v) => v / scale[i]), b[i] / scale[i]]);
+
+  // Tolerance relative to matrix size and typical entry magnitude.
+  const normEst = infinityNorm(a);
+  const tol = EPSILON * Math.max(1, normEst) * n;
 
   for (let col = 0; col < n; col++) {
     let maxRow = col;
@@ -83,7 +136,7 @@ export function luSolve(a, b) {
         maxRow = row;
       }
     }
-    if (maxVal < EPSILON) {
+    if (maxVal < tol) {
       throw new Error('Singular or near-singular matrix');
     }
     if (maxRow !== col) {
@@ -140,26 +193,6 @@ export function inverse3x3(m) {
       (m[0][0] * m[1][1] - m[0][1] * m[1][0]) * invDet,
     ],
   ];
-}
-
-/**
- * Computes the infinity norm (maximum absolute row sum) of a matrix.
- * @param {!Array<!Array<number>>} a
- * @return {number}
- */
-export function infinityNorm(a) {
-  const n = a.length;
-  let maxRowSum = 0;
-  for (let i = 0; i < n; i++) {
-    let sum = 0;
-    for (let j = 0; j < n; j++) {
-      sum += Math.abs(a[i][j]);
-    }
-    if (sum > maxRowSum) {
-      maxRowSum = sum;
-    }
-  }
-  return maxRowSum;
 }
 
 /**

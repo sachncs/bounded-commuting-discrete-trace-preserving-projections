@@ -94,11 +94,12 @@ function buildTetrahedronGeometry(mesh) {
 /**
  * Builds a LineSegments geometry from Alfeld-split triangles.
  * @param {!Object} mesh
+ * @param {!Object} meshRefinement
  * @return {THREE.BufferGeometry}
  */
-function buildAlfeldGeometry(mesh) {
+function buildAlfeldGeometry(mesh, meshRefinement) {
   const lines = [];
-  mesh.alfeldTriangles.forEach((at) => {
+  meshRefinement.alfeldTriangles.forEach((at) => {
     at.triangles.forEach((tri) => {
       const v = tri.map((i) => mesh.vertices[i]);
       lines.push(...v[0], ...v[1], ...v[1], ...v[2], ...v[2], ...v[0]);
@@ -115,9 +116,10 @@ function buildAlfeldGeometry(mesh) {
 /**
  * Renders a mesh into the Three.js group.
  * @param {!Object} mesh
+ * @param {!Object} meshRefinement
  * @param {THREE.Group} meshGroup
  */
-export function renderMesh(mesh, meshGroup) {
+export function renderMesh(mesh, meshRefinement, meshGroup) {
   const geom = buildTetrahedronGeometry(mesh);
   const mat = new THREE.MeshPhysicalMaterial({
     color: 0x6366f1,
@@ -128,7 +130,7 @@ export function renderMesh(mesh, meshGroup) {
   });
   meshGroup.add(new THREE.Mesh(geom, mat));
 
-  const alfeldGeom = buildAlfeldGeometry(mesh);
+  const alfeldGeom = buildAlfeldGeometry(mesh, meshRefinement);
   const alfeldMat = new THREE.LineBasicMaterial({color: 0xfab005});
   meshGroup.add(new THREE.LineSegments(alfeldGeom, alfeldMat));
 }

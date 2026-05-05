@@ -146,22 +146,4 @@ export class Whitney {
     });
   }
 
-  /**
-   * Scalar bubble basis functions for higher-order projections.
-   * @param {number} tIdx
-   * @param {!Array<number>} bary
-   * @param {number} p - Polynomial degree (>= 1).
-   * @return {!Array<number>}
-   */
-  getBubbleBasis(tIdx, bary, p) {
-    const b = bary[0] * bary[1] * bary[2] * bary[3];
-    if (p === 1) {
-      return [b];
-    }
-    const basis = [b];
-    for (let d = 2; d <= p; d++) {
-      basis.push(Math.pow(b, d));
-    }
-    return basis;
-  }
 }

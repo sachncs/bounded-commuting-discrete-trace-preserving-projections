@@ -35,10 +35,23 @@ const MATH_CONSTS = {
 
 const VARIABLES = new Set(['x', 'y', 'z']);
 
+/** @const {number} */
+const MAX_EXPR_LENGTH = 2048;
+/** @const {number} */
+const MAX_TOKENS = 512;
+/** @const {number} */
+const MAX_AST_DEPTH = 64;
+
 function tokenize(expr) {
+  if (expr.length > MAX_EXPR_LENGTH) {
+    throw new Error(`Expression too long (${expr.length} > ${MAX_EXPR_LENGTH})`);
+  }
   const tokens = [];
   let i = 0;
   while (i < expr.length) {
+    if (tokens.length >= MAX_TOKENS) {
+      throw new Error(`Too many tokens (max ${MAX_TOKENS})`);
+    }
     const c = expr[i];
     if (/\s/.test(c)) {
       i++;
@@ -46,7 +59,19 @@ function tokenize(expr) {
     }
     if (/[0-9]/.test(c) || (c === '.' && /[0-9]/.test(expr[i + 1]))) {
       let j = i;
-      while (j < expr.length && (/[0-9]/.test(expr[j]) || expr[j] === '.')) j++;
+      while (j < expr.length && /[0-9]/.test(expr[j])) j++;
+      if (j < expr.length && expr[j] === '.') {
+        j++;
+        while (j < expr.length && /[0-9]/.test(expr[j])) j++;
+      }
+      if (j < expr.length && (expr[j] === 'e' || expr[j] === 'E')) {
+        let k = j + 1;
+        if (k < expr.length && (expr[k] === '+' || expr[k] === '-')) k++;
+        if (k < expr.length && /[0-9]/.test(expr[k])) {
+          j = k;
+          while (j < expr.length && /[0-9]/.test(expr[j])) j++;
+        }
+      }
       tokens.push({type: OPS.NUMBER, value: parseFloat(expr.slice(i, j))});
       i = j;
       continue;
@@ -78,6 +103,7 @@ function tokenize(expr) {
 
 function parse(tokens) {
   let pos = 0;
+  let depth = 0;
   const peek = () => tokens[pos];
   const advance = () => tokens[pos++];
   const expect = (type) => {
@@ -87,11 +113,19 @@ function parse(tokens) {
     return advance();
   };
 
+  function guardDepth() {
+    depth++;
+    if (depth > MAX_AST_DEPTH) {
+      throw new Error(`Expression nesting too deep (max ${MAX_AST_DEPTH})`);
+    }
+  }
+
   function parseExpression() {
     return parseAddSub();
   }
 
   function parseAddSub() {
+    guardDepth();
     let node = parseMulDiv();
     while (true) {
       const t = peek();
@@ -105,10 +139,12 @@ function parse(tokens) {
         break;
       }
     }
+    depth--;
     return node;
   }
 
   function parseMulDiv() {
+    guardDepth();
     let node = parsePower();
     while (true) {
       const t = peek();
@@ -122,36 +158,48 @@ function parse(tokens) {
         break;
       }
     }
+    depth--;
     return node;
   }
 
   function parsePower() {
+    guardDepth();
     let node = parseUnary();
     const t = peek();
     if (t.type === OPS.POW) {
       advance();
       node = {op: 'pow', left: node, right: parsePower()};
     }
+    depth--;
     return node;
   }
 
   function parseUnary() {
+    guardDepth();
     const t = peek();
     if (t.type === OPS.PLUS) {
       advance();
-      return parseUnary();
+      const node = parseUnary();
+      depth--;
+      return node;
     }
     if (t.type === OPS.MINUS) {
       advance();
-      return {op: 'neg', arg: parseUnary()};
+      const node = {op: 'neg', arg: parseUnary()};
+      depth--;
+      return node;
     }
-    return parsePrimary();
+    const node = parsePrimary();
+    depth--;
+    return node;
   }
 
   function parsePrimary() {
+    guardDepth();
     const t = peek();
     if (t.type === OPS.NUMBER) {
       advance();
+      depth--;
       return {op: 'num', value: t.value};
     }
     if (t.type === OPS.IDENT) {
@@ -171,12 +219,15 @@ function parse(tokens) {
         if (!MATH_FUNCS.has(name)) {
           throw new Error(`Unknown function '${name}'`);
         }
+        depth--;
         return {op: 'call', name, args};
       }
       if (VARIABLES.has(name)) {
+        depth--;
         return {op: 'var', name};
       }
       if (name in MATH_CONSTS) {
+        depth--;
         return {op: 'num', value: MATH_CONSTS[name]};
       }
       throw new Error(`Unknown identifier '${name}'`);
@@ -185,6 +236,7 @@ function parse(tokens) {
       advance();
       const node = parseExpression();
       expect(OPS.RPAREN);
+      depth--;
       return node;
     }
     throw new Error(`Unexpected token ${t.type}`);
@@ -197,7 +249,10 @@ function parse(tokens) {
   return ast;
 }
 
-function evaluate(ast, vars) {
+function evaluate(ast, vars, evalDepth = 0) {
+  if (evalDepth > MAX_AST_DEPTH) {
+    throw new Error(`Expression evaluation too deep (max ${MAX_AST_DEPTH})`);
+  }
   switch (ast.op) {
     case 'num': return ast.value;
     case 'var': {
@@ -205,18 +260,18 @@ function evaluate(ast, vars) {
       if (v === undefined) throw new Error(`Undefined variable '${ast.name}'`);
       return v;
     }
-    case 'neg': return -evaluate(ast.arg, vars);
-    case 'add': return evaluate(ast.left, vars) + evaluate(ast.right, vars);
-    case 'sub': return evaluate(ast.left, vars) - evaluate(ast.right, vars);
-    case 'mul': return evaluate(ast.left, vars) * evaluate(ast.right, vars);
+    case 'neg': return -evaluate(ast.arg, vars, evalDepth + 1);
+    case 'add': return evaluate(ast.left, vars, evalDepth + 1) + evaluate(ast.right, vars, evalDepth + 1);
+    case 'sub': return evaluate(ast.left, vars, evalDepth + 1) - evaluate(ast.right, vars, evalDepth + 1);
+    case 'mul': return evaluate(ast.left, vars, evalDepth + 1) * evaluate(ast.right, vars, evalDepth + 1);
     case 'div': {
-      const denom = evaluate(ast.right, vars);
+      const denom = evaluate(ast.right, vars, evalDepth + 1);
       if (denom === 0) throw new Error('Division by zero');
-      return evaluate(ast.left, vars) / denom;
+      return evaluate(ast.left, vars, evalDepth + 1) / denom;
     }
-    case 'pow': return Math.pow(evaluate(ast.left, vars), evaluate(ast.right, vars));
+    case 'pow': return Math.pow(evaluate(ast.left, vars, evalDepth + 1), evaluate(ast.right, vars, evalDepth + 1));
     case 'call': {
-      const args = ast.args.map((a) => evaluate(a, vars));
+      const args = ast.args.map((a) => evaluate(a, vars, evalDepth + 1));
       switch (ast.name) {
         case 'sin': return Math.sin(args[0]);
         case 'cos': return Math.cos(args[0]);

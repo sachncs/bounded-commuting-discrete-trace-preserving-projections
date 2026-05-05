@@ -72,7 +72,7 @@ export class LocalSolver {
    * @param {!Array<number>} b
    * @return {!Array<number>}
    */
-  static solveWithConstraint(K, b) {
+  static solveWithConstraint(K, b, onWarning = console.warn) {
     const n = K.length;
     const KDense = K.map((row) => [...row]);
     for (let j = 0; j < n; j++) {
@@ -83,7 +83,7 @@ export class LocalSolver {
 
     const normEst = infinityNorm(KDense);
     if (normEst > 1e12) {
-      console.warn(
+      onWarning(
         `LocalSolver: matrix is ill-conditioned (norm=${normEst}). ` +
           `Results may be inaccurate.`,
       );
@@ -92,7 +92,13 @@ export class LocalSolver {
     try {
       return luSolve(KDense, bMod);
     } catch (e) {
-      throw new Error(`LocalSolver: failed to solve constrained system. ${e.message}`);
+      onWarning(
+        `LocalSolver: solve failed (${e.message}). ` +
+          `Falling back to uniform zero (vertex-only evaluation).`,
+      );
+      // Uniform zero satisfies the mean-zero constraint and causes the
+      // caller to fall back to simple vertex evaluation.
+      return new Array(n).fill(0);
     }
   }
 }

@@ -1,3 +1,20 @@
+/**
+ * UI module for the BCDTPP web application.
+ *
+ * **Coupling note:** This module is tightly coupled to a specific HTML page
+ * structure.  It references hardcoded DOM element IDs:
+ *   - 'func-input'    – expression input field
+ *   - 'mesh-upload'   – mesh file upload input
+ *   - 'mesh-status'   – status message display
+ *   - 'val-h1'        – H1 result display
+ *   - 'val-hcurl'     – H(curl) result display
+ *   - 'val-hdiv'      – H(div) result display
+ *   - 'val-l2'        – L2 result display
+ *
+ * These IDs must exist in the DOM; the module is not reusable outside the
+ * bundled index.html without modification.
+ */
+
 import {compileExpression} from './lib/safe_eval.js';
 import {norm} from './lib/math_utils.js';
 
@@ -53,12 +70,18 @@ export function getExpression() {
 
 /**
  * Evaluates a compiled expression against the current BCDTPP state.
+ *
+ * Errors are swallowed and replaced with 'ERR' strings to avoid leaking
+ * internal details to the UI.  If you need diagnostics, pass an onError
+ * callback.
+ *
  * @param {string} expr
  * @param {!Object} bcdtpp
  * @param {!Object} mesh
+ * @param {function(Error)=} onError - Optional error handler.
  * @return {{h1: string, hcurl: string, hdiv: string, l2: string}}
  */
-export function evaluateExpression(expr, bcdtpp, mesh) {
+export function evaluateExpression(expr, bcdtpp, mesh, onError) {
   try {
     const u = compileExpression(expr);
     const pt = mesh.getTetrahedronBarycenter(0);
@@ -77,7 +100,7 @@ export function evaluateExpression(expr, bcdtpp, mesh) {
       l2: l2.toFixed(6),
     };
   } catch (e) {
-    console.error(e);
+    if (onError) onError(e);
     return {h1: 'ERR', hcurl: 'ERR', hdiv: 'ERR', l2: 'ERR'};
   }
 }
@@ -105,7 +128,20 @@ export function validateMeshData(data) {
     }
   }
 
+  // Check for coincident vertices (duplicates within 1e-6).
+  const vertexKey = (v) =>
+    `${Math.round(v[0] * 1e6)},${Math.round(v[1] * 1e6)},${Math.round(v[2] * 1e6)}`;
+  const seenVerts = new Set();
+  for (let i = 0; i < data.vertices.length; i++) {
+    const key = vertexKey(data.vertices[i]);
+    if (seenVerts.has(key)) {
+      throw new Error(`Vertices ${i} is coincident with an earlier vertex`);
+    }
+    seenVerts.add(key);
+  }
+
   const vCount = data.vertices.length;
+  const seenTets = new Set();
   for (let i = 0; i < data.tetrahedra.length; i++) {
     const t = data.tetrahedra[i];
     if (!Array.isArray(t) || t.length !== 4 || !t.every((n) => typeof n === 'number' && Number.isInteger(n))) {
@@ -118,5 +154,14 @@ export function validateMeshData(data) {
         );
       }
     }
+    if (new Set(t).size !== 4) {
+      throw new Error(`Tetrahedron ${i} contains duplicate vertex indices`);
+    }
+    const sorted = [...t].sort((a, b) => a - b);
+    const tKey = `${sorted[0]},${sorted[1]},${sorted[2]},${sorted[3]}`;
+    if (seenTets.has(tKey)) {
+      throw new Error(`Tetrahedron ${i} is a duplicate of an earlier tetrahedron`);
+    }
+    seenTets.add(tKey);
   }
 }

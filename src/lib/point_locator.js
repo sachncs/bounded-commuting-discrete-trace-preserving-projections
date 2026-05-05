@@ -16,7 +16,11 @@ export class PointLocator {
   }
 
   /**
-   * Builds the AABB tree recursively.
+   * Builds the AABB tree recursively using median-split along the longest axis.
+   *
+   * Median-split guarantees balanced trees even for elongated meshes, whereas
+   * midpoint-split can place all centroids on one side of the partition plane.
+   *
    * @param {!Array<number>} tetIndices
    * @return {!Object}
    */
@@ -33,37 +37,19 @@ export class PointLocator {
       aabb.max[2] - aabb.min[2],
     ];
     let axis = 0;
-    if (dims[1] > dims[axis]) {
-      axis = 1;
-    }
-    if (dims[2] > dims[axis]) {
-      axis = 2;
-    }
-    const mid = (aabb.min[axis] + aabb.max[axis]) * 0.5;
+    if (dims[1] > dims[axis]) axis = 1;
+    if (dims[2] > dims[axis]) axis = 2;
 
-    const leftTets = [];
-    const rightTets = [];
-    for (const tIdx of tetIndices) {
-      const center = this.#getTetrahedronCenter(tIdx);
-      if (center[axis] < mid) {
-        leftTets.push(tIdx);
-      } else {
-        rightTets.push(tIdx);
-      }
-    }
-
-    if (leftTets.length === 0 || rightTets.length === 0) {
-      const midIdx = Math.floor(tetIndices.length / 2);
-      leftTets.length = 0;
-      rightTets.length = 0;
-      for (let i = 0; i < tetIndices.length; i++) {
-        if (i < midIdx) {
-          leftTets.push(tetIndices[i]);
-        } else {
-          rightTets.push(tetIndices[i]);
-        }
-      }
-    }
+    // Sort by centroid along the longest axis and split at the median.
+    const sorted = [...tetIndices];
+    sorted.sort((a, b) => {
+      const ca = this.#getTetrahedronCenter(a)[axis];
+      const cb = this.#getTetrahedronCenter(b)[axis];
+      return ca - cb;
+    });
+    const midIdx = Math.floor(sorted.length / 2);
+    const leftTets = sorted.slice(0, midIdx);
+    const rightTets = sorted.slice(midIdx);
 
     return {
       aabb,
@@ -147,6 +133,12 @@ export class PointLocator {
 
   /**
    * Computes barycentric coordinates and checks if the point lies inside.
+   *
+   * A small negative tolerance (-1e-9) is used for boundary inclusion to
+   * accommodate floating-point round-off.  Points computed near a face may
+   * have a slightly negative barycentric coordinate; rejecting them would
+   * cause false negatives for points that are geometrically on the boundary.
+   *
    * @param {number} tIdx
    * @param {!Array<number>} point
    * @return {?Array<number>}
@@ -173,6 +165,7 @@ export class PointLocator {
     const lambda1 = det3(e0, b, e2) / det;
     const lambda2 = det3(e0, e1, b) / det;
     const lambda3 = 1 - lambda0 - lambda1 - lambda2;
+    // Small negative tolerance for numerical robustness (see JSDoc above).
     const tol = -1e-9;
     if (lambda0 >= tol && lambda1 >= tol && lambda2 >= tol && lambda3 >= tol) {
       return [lambda0, lambda1, lambda2, lambda3];

@@ -5,15 +5,18 @@
  * used by trace-preserving boundary DoFs.
  */
 
-import {subtract, cross, norm} from './math_utils.js';
+import {subtract, norm, triangleArea} from './math_utils.js';
 import {LocalSolver} from './local_solver.js';
 
 export class BoundaryWeightComputer {
   /**
-   * @param {!Object} mesh
+   * @param {!Mesh} mesh
+   * @param {!MeshRefinement} meshRefinement
    */
-  constructor(mesh) {
+  constructor(mesh, meshRefinement, onWarning = console.warn) {
     this.mesh = mesh;
+    this.meshRefinement = meshRefinement;
+    this.onWarning = onWarning;
   }
 
   /**
@@ -36,7 +39,7 @@ export class BoundaryWeightComputer {
     const zeta0Vertex = new Map();
     for (const vIdx of this.mesh.boundaryNodes) {
       const starFaces = this.mesh.getBoundaryStar(vIdx);
-      const alfeldTris = this.mesh.alfeldTriangles.filter((at) =>
+      const alfeldTris = this.meshRefinement.alfeldTriangles.filter((at) =>
         starFaces.includes(at.parentFaceIdx),
       );
 
@@ -52,13 +55,13 @@ export class BoundaryWeightComputer {
       const b = new Array(nodeMap.length).fill(0);
 
       const starArea = starFaces.reduce(
-        (acc, fIdx) => acc + this.#getFaceArea(fIdx),
+        (acc, fIdx) => acc + this.mesh.getFaceArea(fIdx),
         0,
       );
       const eta = 1.0 / starArea;
 
       localTris.forEach((tri) => {
-        const area = this.#getTriangleArea(
+        const area = triangleArea(
           localVerts[tri[0]],
           localVerts[tri[1]],
           localVerts[tri[2]],
@@ -68,7 +71,7 @@ export class BoundaryWeightComputer {
         });
       });
 
-      const psi = LocalSolver.solveWithConstraint(K, b);
+      const psi = LocalSolver.solveWithConstraint(K, b, this.onWarning);
       zeta0Vertex.set(vIdx, {nodeMap, psi});
     }
     return zeta0Vertex;
@@ -99,26 +102,9 @@ export class BoundaryWeightComputer {
     const zeta2Face = new Map();
     for (const fIdx of this.mesh.boundaryFaces) {
       const normal = this.mesh.getFaceOutwardNormal(fIdx);
-      const area = this.#getFaceArea(fIdx);
+      const area = this.mesh.getFaceArea(fIdx);
       zeta2Face.set(fIdx, {normal, area});
     }
     return zeta2Face;
-  }
-
-  /** @private */
-  #getFaceArea(fIdx) {
-    const f = this.mesh.faces[fIdx];
-    return this.#getTriangleArea(
-      this.mesh.vertices[f[0]],
-      this.mesh.vertices[f[1]],
-      this.mesh.vertices[f[2]],
-    );
-  }
-
-  /** @private */
-  #getTriangleArea(p1, p2, p3) {
-    const v1 = subtract(p2, p1);
-    const v2 = subtract(p3, p1);
-    return 0.5 * norm(cross(v1, v2));
   }
 }

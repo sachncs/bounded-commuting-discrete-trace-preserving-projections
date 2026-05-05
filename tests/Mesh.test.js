@@ -1,5 +1,6 @@
 import {describe, it, expect} from 'vitest';
 import {Mesh} from '../src/lib/mesh.js';
+import {MeshRefinement} from '../src/lib/mesh_refinement.js';
 
 describe('Mesh', () => {
   const singleTet = {
@@ -32,24 +33,6 @@ describe('Mesh', () => {
     expect(mesh.getVolume(0)).toBeLessThan(1e-12);
   });
 
-  it('computes Alfeld split', () => {
-    const mesh = new Mesh(singleTet.vertices, singleTet.tetrahedra);
-    mesh.computeAlfeldSplit();
-    expect(mesh.alfeldTriangles.length).toBe(4);
-    const totalSubTris = mesh.alfeldTriangles.reduce(
-      (s, at) => s + at.triangles.length,
-      0,
-    );
-    expect(totalSubTris).toBe(12);
-  });
-
-  it('computes Worsey-Farin split', () => {
-    const mesh = new Mesh(singleTet.vertices, singleTet.tetrahedra);
-    mesh.computeWorseyFarinSplit();
-    expect(mesh.worseyFarinTetrahedra.length).toBe(1);
-    expect(mesh.worseyFarinTetrahedra[0].tetrahedra.length).toBe(12);
-  });
-
   it('getBoundaryStar returns correct faces for a vertex', () => {
     const mesh = new Mesh(singleTet.vertices, singleTet.tetrahedra);
     const star = mesh.getBoundaryStar(0);
@@ -70,5 +53,32 @@ describe('Mesh', () => {
     expect(mesh.tetrahedronCount).toBe(2);
     expect(mesh.faces.length).toBe(7);
     expect(mesh.boundaryFaces.length).toBe(6);
+  });
+});
+
+describe('MeshRefinement', () => {
+  const singleTet = {
+    vertices: [[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]],
+    tetrahedra: [[0, 1, 2, 3]],
+  };
+
+  it('computes Alfeld split', () => {
+    const mesh = new Mesh(singleTet.vertices, singleTet.tetrahedra);
+    const refinement = new MeshRefinement(mesh);
+    refinement.computeAlfeldSplit();
+    expect(refinement.alfeldTriangles.length).toBe(4);
+    const totalSubTris = refinement.alfeldTriangles.reduce(
+      (s, at) => s + at.triangles.length,
+      0,
+    );
+    expect(totalSubTris).toBe(12);
+  });
+
+  it('computes Worsey-Farin split', () => {
+    const mesh = new Mesh(singleTet.vertices, singleTet.tetrahedra);
+    const refinement = new MeshRefinement(mesh);
+    refinement.computeWorseyFarinSplit();
+    expect(refinement.worseyFarinTetrahedra.length).toBe(1);
+    expect(refinement.worseyFarinTetrahedra[0].tetrahedra.length).toBe(12);
   });
 });
