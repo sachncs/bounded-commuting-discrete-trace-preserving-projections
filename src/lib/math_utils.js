@@ -147,7 +147,7 @@ export function inverse3x3(m) {
  * @param {!Array<!Array<number>>} a
  * @return {number}
  */
-export function infinityNormEstimate(a) {
+export function infinityNorm(a) {
   const n = a.length;
   let maxRowSum = 0;
   for (let i = 0; i < n; i++) {

@@ -3,7 +3,7 @@
  * weight computation.
  */
 
-import {dot, cross, subtract, norm, zeros, luSolve, infinityNormEstimate} from './math_utils.js';
+import {dot, cross, subtract, norm, zeros, luSolve, infinityNorm} from './math_utils.js';
 
 export class LocalSolver {
   /**
@@ -81,7 +81,7 @@ export class LocalSolver {
     const bMod = [...b];
     bMod[n - 1] = 0;
 
-    const normEst = infinityNormEstimate(KDense);
+    const normEst = infinityNorm(KDense);
     if (normEst > 1e12) {
       console.warn(
         `LocalSolver: matrix is ill-conditioned (norm=${normEst}). ` +

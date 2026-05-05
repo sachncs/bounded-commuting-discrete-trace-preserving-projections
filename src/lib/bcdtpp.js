@@ -6,9 +6,9 @@
  */
 
 import {
-  subtract, cross, norm, dot, luSolve,
+  subtract, cross, norm, dot,
 } from './math_utils.js';
-import {LocalSolver} from './local_solver.js';
+import {BoundaryWeightComputer} from './boundary_weight_computer.js';
 import {
   barycentricToCartesian,
   integrateTetrahedron,
@@ -23,6 +23,7 @@ export class Bcdtpp {
    * @param {!Mesh} mesh
    * @param {!Whitney} whitney
    * @param {!Object=} options
+   * @param {number=} options.quadratureOrder - Quadrature order for integration (default 3).
    */
   constructor(mesh, whitney, options = {}) {
     this.mesh = mesh;
@@ -66,73 +67,11 @@ export class Bcdtpp {
 
   /** Section 6.3.1: Construction of lowest-order vertex weights. */
   computeBoundaryWeights() {
-    for (const vIdx of this.mesh.boundaryNodes) {
-      const starFaces = this.mesh.getBoundaryStar(vIdx);
-      const alfeldTris = this.mesh.alfeldTriangles.filter((at) =>
-        starFaces.includes(at.parentFaceIdx),
-      );
-
-      const triangles = alfeldTris.flatMap((at) => at.triangles);
-      const starNodes = new Set(triangles.flat());
-      const nodeMap = Array.from(starNodes);
-      const invNodeMap = new Map(nodeMap.map((id, i) => [id, i]));
-
-      const localTris = triangles.map((t) => t.map((v) => invNodeMap.get(v)));
-      const localVerts = nodeMap.map((v) => this.mesh.vertices[v]);
-
-      const K = LocalSolver.assembleSurfaceStiffness(localVerts, localTris);
-      const b = new Array(nodeMap.length).fill(0);
-
-      const starArea = starFaces.reduce(
-        (acc, fIdx) => acc + this.#getFaceArea(fIdx),
-        0,
-      );
-      const eta = 1.0 / starArea;
-
-      localTris.forEach((tri) => {
-        const area = this.#getTriangleArea(
-          localVerts[tri[0]],
-          localVerts[tri[1]],
-          localVerts[tri[2]],
-        );
-        tri.forEach((nodeIdx) => {
-          b[nodeIdx] += eta * (area / 3.0);
-        });
-      });
-
-      const psi = LocalSolver.solveWithConstraint(K, b);
-      this.zeta0Vertex.set(vIdx, {nodeMap, psi});
-    }
-
-    this.#computeEdgeBoundaryWeights();
-    this.#computeFaceBoundaryWeights();
-  }
-
-  /** @private */
-  #computeEdgeBoundaryWeights() {
-    for (const eIdx of this.mesh.boundaryEdges) {
-      const e = this.mesh.edges[eIdx];
-      const edgeVec = subtract(this.mesh.vertices[e[1]], this.mesh.vertices[e[0]]);
-      const edgeLen = norm(edgeVec);
-      if (edgeLen < 1e-12) {
-        continue;
-      }
-      this.zeta1Edge.set(eIdx, {
-        v0: e[0],
-        v1: e[1],
-        tangent: edgeVec.map((x) => x / edgeLen),
-        length: edgeLen,
-      });
-    }
-  }
-
-  /** @private */
-  #computeFaceBoundaryWeights() {
-    for (const fIdx of this.mesh.boundaryFaces) {
-      const normal = this.mesh.getFaceOutwardNormal(fIdx);
-      const area = this.#getFaceArea(fIdx);
-      this.zeta2Face.set(fIdx, {normal, area});
-    }
+    const computer = new BoundaryWeightComputer(this.mesh);
+    const weights = computer.compute();
+    this.zeta0Vertex = weights.zeta0Vertex;
+    this.zeta1Edge = weights.zeta1Edge;
+    this.zeta2Face = weights.zeta2Face;
   }
 
   /**
@@ -297,9 +236,9 @@ export class Bcdtpp {
    * @param {function(!Array<number>): (number|!Array<number>)} u
    * @param {!Array<number>} point
    * @param {number} tIdx
-   * @param {number} l
+   * @param {number} l - Form degree (0=H1 scalar, 1=Hcurl vector, 2=Hdiv vector, 3=L2 scalar).
    * @param {number} p
-   * @return {(number|!Array<number>)}
+   * @return {(number|!Array<number>)} Returns a number for l=0 or l=3, and a 3-vector for l=1 or l=2.
    */
   projectHp(u, point, tIdx, l, p) {
     if (p === 0) {

@@ -139,6 +139,9 @@ export function integrateTriangle(vertices, fn, order = 2) {
  * Returns quadrature points and weights on the reference interval [0, 1].
  * @param {number} order - Target polynomial exactness (1, 2, or 3).
  * @return {{points: !Array<number>, weights: !Array<number>}}
+ * @example
+ * const {points, weights} = lineQuadrature(2);
+ * const integral = points.reduce((s, x, i) => s + weights[i] * f(x), 0);
  */
 export function lineQuadrature(order) {
   switch (order) {
