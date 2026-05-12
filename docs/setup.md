@@ -16,8 +16,8 @@ npm install bcdtpp
 ### From source
 
 ```bash
-git clone https://github.com/sachin/bcdtpp.git
-cd bcdtpp
+git clone https://github.com/sachn-cs/bounded-commuting-discrete-trace-preserving-projections.git
+cd bounded-commuting-discrete-trace-preserving-projections
 npm install
 ```
 

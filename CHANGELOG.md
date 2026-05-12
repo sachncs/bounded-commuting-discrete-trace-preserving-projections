@@ -2,6 +2,35 @@
 
 All notable changes to this project will be documented in this file.
 
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added
+
+- Rollup + Babel build system producing ESM, CJS, and UMD bundles.
+- StandardJS linting with zero-config workflow.
+- Mocha + Chai + Sinon test suite migrated from Vitest.
+- c8 code coverage reporting (text, HTML, lcov).
+- jsdoc-to-markdown API documentation generation.
+- GitHub Actions CI workflow for Node.js 20 and 22.
+- GitHub Actions publish workflow triggered on release creation.
+- Comprehensive `docs/` folder with architecture, math, exceptions, setup, development, testing, and publishing guides.
+- Community files: `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `SECURITY.md`, `LICENSE`.
+- GitHub issue and pull request templates.
+
+### Changed
+
+- Overhauled `package.json` scripts, dependencies, and metadata for npm readiness.
+- Updated `README.md` with installation badges, workflow table, project structure, API overview, error handling, TypeScript notes, browser usage, performance characteristics, and roadmap.
+
+### Removed
+
+- Vitest and `@vitest/coverage-v8`.
+- ESLint + Prettier configuration files.
+- `tsconfig.json`.
+
 ## [0.1.0] — 2026-05-04
 
 ### Changed

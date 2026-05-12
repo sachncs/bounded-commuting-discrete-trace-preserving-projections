@@ -1,13 +1,32 @@
 # Bcdtpp.js
 
-[![CI](https://github.com/sachin/bcdtpp/actions/workflows/ci.yml/badge.svg)](https://github.com/sachin/bcdtpp/actions/workflows/ci.yml)
+[![CI](https://github.com/sachn-cs/bounded-commuting-discrete-trace-preserving-projections/actions/workflows/ci.yml/badge.svg)](https://github.com/sachn-cs/bounded-commuting-discrete-trace-preserving-projections/actions/workflows/ci.yml)
 [![JavaScript Style Guide](https://img.shields.io/badge/code_style-standard-brightgreen.svg)](https://standardjs.com)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 JavaScript implementation of **Bounded, Commuting, Discrete-trace Preserving Projections** for the 3D de Rham complex on simplicial meshes.
 
 Based on the paper: [*Ern, Guzmán, Potu (2026) arXiv:2604.28103v1*](https://arxiv.org/abs/2604.28103).
 
 > **Disclaimer:** I am not an author of the paper above. This repository is an independent JavaScript implementation of the algorithm described in that work.
+
+## Table of Contents
+
+- [Features](#features)
+- [Installation](#installation)
+- [Usage](#usage)
+- [API Overview](#api-overview)
+- [Error Handling](#error-handling)
+- [TypeScript](#typescript)
+- [Browser Usage](#browser-usage)
+- [Performance](#performance)
+- [Development](#development)
+- [Project Structure](#project-structure)
+- [Mathematical Background](#mathematical-background)
+- [What's Next](#whats-next)
+- [Changelog](#changelog)
+- [Contributing](#contributing)
+- [License](#license)
 
 ## Features
 
@@ -34,8 +53,8 @@ npm install bcdtpp
 ### From source
 
 ```bash
-git clone https://github.com/sachin/bcdtpp.git
-cd bcdtpp
+git clone https://github.com/sachn-cs/bounded-commuting-discrete-trace-preserving-projections.git
+cd bounded-commuting-discrete-trace-preserving-projections
 npm install
 ```
 
@@ -81,6 +100,61 @@ const val = bcdtpp.projectHp(u, point, tetIdx, /* l */ 0, /* p */ 2)
 const result = bcdtpp.projectAtPoint(u, [0.1, 0.2, 0.3], /* l */ 0, /* p */ 0)
 // result = { value, tIdx, bary }
 ```
+
+## API Overview
+
+The package exports the following named entities:
+
+| Export | Subpath | Description |
+|--------|---------|-------------|
+| `Bcdtpp` | `bcdtpp` | Main projection orchestrator |
+| `Mesh` | `bcdtpp/mesh` | Tetrahedral mesh topology and geometry |
+| `Whitney` | `bcdtpp/whitney` | Barycentric coordinates and Whitney basis |
+| `PointLocator` | `bcdtpp/point-locator` | AABB tree point-in-tet locator |
+| `quadrature` | `bcdtpp/quadrature` | Gaussian quadrature utilities |
+| `mathUtils` | `bcdtpp/math-utils` | Linear algebra primitives |
+
+All subpaths are exposed via the `exports` field in `package.json` and include hand-written `.d.ts` files.
+
+## Error Handling
+
+The library throws specific error subclasses so callers can distinguish mesh problems from projection problems:
+
+- `MeshValidationError` — Invalid mesh data (degenerate tets, bad indices, non-finite vertices).
+- `ProjectionError` — Invalid arguments to projection methods or unsupported configurations.
+- `SingularMatrixError` — Numerical linear algebra failure (singular Jacobian, zero pivot).
+
+Recoverable boundary-weight failures emit warnings rather than throwing, so a single bad element does not halt the entire mesh projection. See [docs/exceptions.md](docs/exceptions.md) for the full taxonomy.
+
+## TypeScript
+
+Hand-written `.d.ts` declaration files are co-located with every source module in `src/lib/`. If your bundler does not resolve them automatically, reference the package in your `tsconfig.json`:
+
+```json
+{
+  "compilerOptions": {
+    "types": ["bcdtpp"]
+  }
+}
+```
+
+## Browser Usage
+
+The UMD bundle is available via CDN:
+
+```html
+<script src="https://cdn.jsdelivr.net/npm/bcdtpp/dist/bcdtpp.umd.js"></script>
+<script>
+  const { Mesh, Whitney, Bcdtpp } = window.bcdtpp
+</script>
+```
+
+## Performance
+
+- **Mesh construction**: `O(V + T)` where `V` is vertices and `T` is tetrahedra.
+- **Point location**: `O(log T)` per query after AABB tree construction.
+- **Boundary weight computation**: `O(V * k)` where `k` is the typical boundary-patch size; this is the dominant upfront cost.
+- **Per-element projection**: `O(1)` for lowest-order; `O(p^3)` for higher-order scalar enrichment.
 
 ## Development
 
@@ -132,7 +206,7 @@ docs/
   publishing.md              — Versioning and release process
 ```
 
-## Mathematical Implementation Details
+## Mathematical Background
 
 This library implements the construction of boundary correction operators `Pi_partial^l`.
 The final projection is defined as:
@@ -142,6 +216,32 @@ Pi^l = Pi_partial^l + Pi_ring^l (I - Pi_partial^l)
 ```
 
 The novel contribution of the paper is the construction of `Pi_partial^l` using local problems on subdivided patches to ensure stability and trace-preservation.
+
+See [docs/math.md](docs/math.md) for the full mathematical exposition (de Rham complex, Whitney forms, commuting diagrams, and mesh refinement theory).
+
+## What's Next
+
+The following items are planned but not yet implemented. Contributions are welcome.
+
+### High Priority
+
+- **Vector-valued higher-order projections** (`l = 1, 2`, `p > 0`): Nédélec and Raviart-Thomas enrichment for `H(curl)` and `H(div)`.
+- **Adaptive mesh refinement support**: Integrate `MeshRefinement` APIs into `Bcdtpp` so boundary weights can be recomputed incrementally as the mesh refines.
+
+### Medium Priority
+
+- **Web Worker parallelization**: Offload per-tet projection and boundary weight solves to workers for large meshes.
+- **WASM acceleration**: Port the dense linear algebra routines (`luSolve`, `inverse3x3`) to WebAssembly for a 2-5x speedup.
+
+### Low Priority / Research
+
+- **Anisotropic mesh support**: Generalize the point locator and quadrature to handle highly stretched tets without loss of precision.
+- **Time-dependent projections**: Cache-friendly APIs for projecting fields that evolve between time steps.
+- **Arbitrary polynomial degree `p`**: Unify the scalar bubble and L2 monomial bases into a single hierarchical basis generator.
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for a detailed history of releases and breaking changes.
 
 ## Contributing
 
