@@ -3,7 +3,8 @@
  * weight computation.
  */
 
-import {dot, cross, subtract, norm, zeros, luSolve, infinityNorm} from './math_utils.js';
+import { dot, cross, subtract, norm, zeros, luSolve, infinityNorm } from './math_utils.js'
+import { SingularMatrixError } from './errors.js'
 
 export class LocalSolver {
   /**
@@ -12,22 +13,22 @@ export class LocalSolver {
    * @param {!Array<!Array<number>>} triangles
    * @return {!Array<!Array<number>>}
    */
-  static assembleSurfaceStiffness(vertices, triangles) {
-    const n = vertices.length;
-    const K = zeros(n, n);
+  static assembleSurfaceStiffness (vertices, triangles) {
+    const n = vertices.length
+    const K = zeros(n, n)
 
     triangles.forEach((tri) => {
-      const v = tri.map((i) => vertices[i]);
-      const ke = LocalSolver.#triangleStiffness(v);
+      const v = tri.map((i) => vertices[i])
+      const ke = LocalSolver.#triangleStiffness(v)
 
       for (let i = 0; i < 3; i++) {
         for (let j = 0; j < 3; j++) {
-          K[tri[i]][tri[j]] += ke[i][j];
+          K[tri[i]][tri[j]] += ke[i][j]
         }
       }
-    });
+    })
 
-    return K;
+    return K
   }
 
   /**
@@ -36,26 +37,26 @@ export class LocalSolver {
    * @return {!Array<!Array<number>>}
    * @private
    */
-  static #triangleStiffness(v) {
-    const v1 = subtract(v[1], v[0]);
-    const v2 = subtract(v[2], v[0]);
+  static #triangleStiffness (v) {
+    const v1 = subtract(v[1], v[0])
+    const v2 = subtract(v[2], v[0])
 
-    const c = cross(v1, v2);
-    const area = 0.5 * norm(c);
+    const c = cross(v1, v2)
+    const area = 0.5 * norm(c)
 
     if (area < 1e-12) {
-      throw new Error(`Degenerate triangle in stiffness assembly: area=${area}`);
+      throw new SingularMatrixError(`Degenerate triangle in stiffness assembly: area=${area}`)
     }
 
-    const G = [subtract(v[2], v[1]), subtract(v[0], v[2]), subtract(v[1], v[0])];
+    const G = [subtract(v[2], v[1]), subtract(v[0], v[2]), subtract(v[1], v[0])]
 
-    const ke = zeros(3, 3);
+    const ke = zeros(3, 3)
     for (let i = 0; i < 3; i++) {
       for (let j = 0; j < 3; j++) {
-        ke[i][j] = dot(G[i], G[j]) / (4 * area);
+        ke[i][j] = dot(G[i], G[j]) / (4 * area)
       }
     }
-    return ke;
+    return ke
   }
 
   /**
@@ -72,33 +73,36 @@ export class LocalSolver {
    * @param {!Array<number>} b
    * @return {!Array<number>}
    */
-  static solveWithConstraint(K, b, onWarning = console.warn) {
-    const n = K.length;
-    const KDense = K.map((row) => [...row]);
-    for (let j = 0; j < n; j++) {
-      KDense[n - 1][j] = 1.0;
+  static solveWithConstraint (K, b, onWarning = console.warn) {
+    const n = K.length
+    if (n === 0) {
+      return []
     }
-    const bMod = [...b];
-    bMod[n - 1] = 0;
+    const KDense = K.map((row) => [...row])
+    for (let j = 0; j < n; j++) {
+      KDense[n - 1][j] = 1.0
+    }
+    const bMod = [...b]
+    bMod[n - 1] = 0
 
-    const normEst = infinityNorm(KDense);
+    const normEst = infinityNorm(KDense)
     if (normEst > 1e12) {
-      onWarning(
-        `LocalSolver: matrix is ill-conditioned (norm=${normEst}). ` +
-          `Results may be inaccurate.`,
-      );
+      onWarning({
+        code: 'LOCAL_SOLVER_ILL_CONDITIONED',
+        severity: 'warn',
+        message:
+          `LocalSolver: matrix is ill-conditioned (norm=${normEst}). ` +
+          'Results may be inaccurate.'
+      })
     }
 
     try {
-      return luSolve(KDense, bMod);
+      return luSolve(KDense, bMod)
     } catch (e) {
-      onWarning(
-        `LocalSolver: solve failed (${e.message}). ` +
-          `Falling back to uniform zero (vertex-only evaluation).`,
-      );
-      // Uniform zero satisfies the mean-zero constraint and causes the
-      // caller to fall back to simple vertex evaluation.
-      return new Array(n).fill(0);
+      throw new SingularMatrixError(
+        `LocalSolver: constrained solve failed (${e.message}). ` +
+          'Patch matrix may be singular or ill-conditioned.'
+      )
     }
   }
 }

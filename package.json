@@ -1,20 +1,84 @@
 {
   "name": "bcdtpp",
-  "version": "0.0.1",
-  "private": true,
+  "version": "0.1.0",
+  "description": "Bounded, Commuting, Discrete-trace Preserving Projections for the 3D de Rham complex on simplicial meshes.",
   "type": "module",
+  "main": "src/lib/bcdtpp.js",
+  "module": "dist/bcdtpp.esm.js",
+  "unpkg": "dist/bcdtpp.umd.js",
+  "jsdelivr": "dist/bcdtpp.umd.js",
+  "exports": {
+    ".": {
+      "types": "./src/lib/bcdtpp.d.ts",
+      "default": "./src/lib/bcdtpp.js"
+    },
+    "./mesh": {
+      "types": "./src/lib/mesh.d.ts",
+      "default": "./src/lib/mesh.js"
+    },
+    "./whitney": {
+      "types": "./src/lib/whitney.d.ts",
+      "default": "./src/lib/whitney.js"
+    },
+    "./quadrature": {
+      "types": "./src/lib/quadrature.d.ts",
+      "default": "./src/lib/quadrature.js"
+    },
+    "./math-utils": {
+      "types": "./src/lib/math_utils.d.ts",
+      "default": "./src/lib/math_utils.js"
+    },
+    "./point-locator": {
+      "types": "./src/lib/point_locator.d.ts",
+      "default": "./src/lib/point_locator.js"
+    }
+  },
+  "types": "src/lib/bcdtpp.d.ts",
+  "files": [
+    "src/lib/",
+    "dist/",
+    "docs/",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "test": "vitest",
-    "test:run": "vitest run"
+    "lint": "standard src/lib/**/*.js tests/**/*.js",
+    "lint:fix": "standard --fix src/lib/**/*.js tests/**/*.js",
+    "test": "mocha tests/**/*.test.js",
+    "test:watch": "mocha tests/**/*.test.js --watch",
+    "test:coverage": "c8 --reporter=text --reporter=html --reporter=lcov npm test",
+    "docs": "jsdoc2md --files src/lib/**/*.js > docs/api.md",
+    "build": "rollup -c rollup.dist.config.js",
+    "build:full": "npm run build && npm run docs"
   },
   "devDependencies": {
-    "vite": "^8.0.10",
-    "vitest": "^3.0.0"
+    "@babel/core": "^7.29.0",
+    "@babel/preset-env": "^7.29.5",
+    "@rollup/plugin-babel": "^7.0.0",
+    "@rollup/plugin-commonjs": "^29.0.2",
+    "@rollup/plugin-node-resolve": "^16.0.1",
+    "@rollup/plugin-terser": "^1.0.0",
+    "c8": "^10.1.3",
+    "chai": "^5.2.2",
+    "jsdoc-to-markdown": "^9.1.1",
+    "mocha": "^11.7.5",
+    "rollup": "^4.60.3",
+    "sinon": "^22.0.0",
+    "standard": "^17.1.2"
   },
-  "dependencies": {
-    "three": "^0.184.0"
+  "standard": {
+    "globals": [
+      "describe",
+      "it",
+      "before",
+      "beforeEach",
+      "after",
+      "afterEach"
+    ],
+    "ignore": [
+      "dist/",
+      "coverage/",
+      "node_modules/"
+    ]
   }
 }

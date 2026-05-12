@@ -6,18 +6,17 @@
  */
 
 import {
-  subtract, norm, dot, triangleArea,
-} from './math_utils.js';
-import {BoundaryWeightComputer} from './boundary_weight_computer.js';
-import {
-  barycentricToCartesian,
-  integrateTetrahedron,
-  triangleQuadrature,
-  lineQuadrature,
-} from './quadrature.js';
-import {PointLocator} from './point_locator.js';
-import {HigherOrderProjection} from './higher_order_projection.js';
-import {MeshRefinement} from './mesh_refinement.js';
+  numericalGradient
+} from './math_utils.js'
+import { ProjectionError } from './errors.js'
+import { BoundaryWeightComputer } from './boundary_weight_computer.js'
+import { PointLocator } from './point_locator.js'
+import { HigherOrderProjection } from './higher_order_projection.js'
+import { MeshRefinement } from './mesh_refinement.js'
+import { H1Projector } from './projectors/h1_projector.js'
+import { HcurlProjector } from './projectors/hcurl_projector.js'
+import { HdivProjector } from './projectors/hdiv_projector.js'
+import { L2Projector } from './projectors/l2_projector.js'
 
 /**
  * BCDTPP: Bounded, Commuting, Discrete-trace Preserving Projections.
@@ -25,18 +24,42 @@ import {MeshRefinement} from './mesh_refinement.js';
  * Implements the de Rham projection operators Pi^l for l = 0,1,2,3 on
  * tetrahedral meshes with boundary-aware trace preservation.
  *
- * **Coupling note:** This class is tightly coupled to the {@link Mesh} data
- * structure.  It accesses mesh internals (vertices, faces, edges, boundary
- * flags, orientation signs, etc.) directly.  Swapping in a different mesh
- * implementation requires updating every property access inside this class.
+ * **Coupling note:** This class accesses mesh data through the {@link Mesh}
+ * public API (getters for vertices, faces, edges, boundary flags, orientation
+ * signs, etc.).  Swapping in a different mesh implementation requires only that
+ * the new class implements the same getter interface.
  */
 export class Bcdtpp {
+  /** @type {!Mesh} */
+  #mesh
+  /** @type {!Whitney} */
+  #whitney
+  /** @type {number} */
+  #quadratureOrder
+  /** @type {(msg: string) => void} */
+  #onWarning
+  /** @type {PointLocator|null} */
+  #pointLocator
+  /** @type {!MeshRefinement} */
+  #meshRefinement
+  /** @type {!BoundaryWeightComputer} */
+  #boundaryWeightComputer
+  /** @type {!HigherOrderProjection} */
+  #higherOrderProjector
+  /** @type {!H1Projector} */
+  #h1Projector
+  /** @type {!HcurlProjector} */
+  #hcurlProjector
+  /** @type {!HdivProjector} */
+  #hdivProjector
+  /** @type {!L2Projector} */
+  #l2Projector
   /** @type {!Map<number, {nodeMap: !Array<number>, psi: !Array<number>}>} */
-  #zeta0Vertex;
-  /** @type {!Map<number, {v0: number, v1: number, tangent: !Array<number>, length: number}>} */
-  #zeta1Edge;
-  /** @type {!Map<number, {normal: !Array<number>, area: number}>} */
-  #zeta2Face;
+  #vertexBoundaryData
+  /** @type {!Set<number>} */
+  #boundaryEdgeSet
+  /** @type {!Set<number>} */
+  #boundaryFaceSet
 
   /**
    * @param {!Mesh} mesh
@@ -44,73 +67,98 @@ export class Bcdtpp {
    * @param {!Object=} options
    * @param {number=} options.quadratureOrder - Quadrature order for integration (default 3).
    */
-  constructor(mesh, whitney, options = {}) {
-    this.mesh = mesh;
-    this.whitney = whitney;
-    this.quadratureOrder = options.quadratureOrder || 3;
-    this.onWarning = options.onWarning || ((msg) => console.warn(msg));
-    this.#zeta0Vertex = new Map();
-    this.#zeta1Edge = new Map();
-    this.#zeta2Face = new Map();
-    this.pointLocator = null;
+  constructor (mesh, whitney, options = {}) {
+    this.#mesh = mesh
+    this.#whitney = whitney
+    this.#quadratureOrder = options.quadratureOrder || 3
+    this.#onWarning =
+      options.onWarning || ((ctx) => console.warn(ctx.message ?? ctx))
+    this.#vertexBoundaryData = new Map()
+    this.#pointLocator = null
 
-    this.meshRefinement = new MeshRefinement(this.mesh);
-    this.meshRefinement.computeWorseyFarinSplit();
-    this.boundaryWeightComputer = new BoundaryWeightComputer(
-      this.mesh,
-      this.meshRefinement,
-      this.onWarning,
-    );
+    this.#meshRefinement = new MeshRefinement(this.#mesh)
+    this.#boundaryWeightComputer = new BoundaryWeightComputer(
+      this.#mesh,
+      this.#meshRefinement,
+      this.#onWarning
+    )
 
-    this.higherOrderProjector = new HigherOrderProjection(
-      this.mesh,
-      this.whitney,
-      this.quadratureOrder,
-      this.onWarning,
-    );
+    this.#boundaryEdgeSet = new Set(this.#mesh.getBoundaryEdges())
+    this.#boundaryFaceSet = new Set(this.#mesh.getBoundaryFaces())
 
-    this.#validateMesh();
+    this.#higherOrderProjector = new HigherOrderProjection(
+      this.#mesh,
+      this.#whitney,
+      this.#quadratureOrder,
+      this.#onWarning
+    )
+
+    this.#h1Projector = new H1Projector(this.#mesh, this.#whitney, this.#meshRefinement)
+    this.#hcurlProjector = new HcurlProjector(this.#mesh, this.#whitney, this.#quadratureOrder)
+    this.#hdivProjector = new HdivProjector(this.#mesh, this.#whitney, this.#quadratureOrder)
+    this.#l2Projector = new L2Projector(this.#mesh, this.#whitney, this.#quadratureOrder)
+
+    this.#validateMesh()
   }
 
   /** @private */
-  #validateMesh() {
-    let degenerateCount = 0;
-    for (let tIdx = 0; tIdx < this.mesh.tetrahedronCount; tIdx++) {
-      const vol = this.mesh.getVolume(tIdx);
+  #validateMesh () {
+    let degenerateCount = 0
+    for (let tIdx = 0; tIdx < this.#mesh.tetrahedronCount; tIdx++) {
+      const vol = this.#mesh.getVolume(tIdx)
       if (vol < 1e-12) {
-        degenerateCount++;
+        degenerateCount++
       }
     }
     if (degenerateCount > 0) {
-      this.onWarning(
-        `Mesh contains ${degenerateCount} degenerate or near-degenerate ` +
-          `tetrahedra. Projections may fail.`,
-      );
+      this.#onWarning({
+        code: 'BCDTPP_DEGENERATE_MESH',
+        severity: 'warn',
+        message:
+          `Bcdtpp: mesh contains ${degenerateCount} degenerate or ` +
+          'near-degenerate tetrahedra. Projections may fail.'
+      })
     }
   }
 
-  buildPointLocator() {
-    this.pointLocator = new PointLocator(this.mesh);
+  /** Quadrature order used for integrations. */
+  get quadratureOrder () {
+    return this.#quadratureOrder
+  }
+
+  buildPointLocator () {
+    this.#pointLocator = new PointLocator(this.#mesh)
   }
 
   /** @private */
-  #validateTetIdx(tIdx) {
+  #validateTetIdx (tIdx) {
     if (typeof tIdx !== 'number' || !Number.isInteger(tIdx)) {
-      throw new Error(`tIdx must be an integer, got ${tIdx}`);
+      throw new ProjectionError(`tIdx must be an integer, got ${tIdx}`)
     }
-    if (tIdx < 0 || tIdx >= this.mesh.tetrahedronCount) {
-      throw new Error(
-        `tIdx=${tIdx} out of range [0, ${this.mesh.tetrahedronCount - 1}]`,
-      );
+    if (tIdx < 0 || tIdx >= this.#mesh.tetrahedronCount) {
+      throw new ProjectionError(
+        `tIdx=${tIdx} out of range [0, ${this.#mesh.tetrahedronCount - 1}]`
+      )
+    }
+  }
+
+  /** @private */
+  static #validatePoint (point) {
+    if (!Array.isArray(point) || point.length !== 3 ||
+        !point.every((n) => typeof n === 'number' && Number.isFinite(n))) {
+      throw new ProjectionError(
+        `point must be an array of 3 finite numbers, got ${JSON.stringify(point)}`
+      )
     }
   }
 
   /** Section 6.3.1: Construction of lowest-order vertex weights. */
-  computeBoundaryWeights() {
-    const weights = this.boundaryWeightComputer.compute();
-    this.#zeta0Vertex = weights.zeta0Vertex;
-    this.#zeta1Edge = weights.zeta1Edge;
-    this.#zeta2Face = weights.zeta2Face;
+  computeBoundaryWeights () {
+    if (this.#meshRefinement.alfeldTriangles.length === 0) {
+      this.#meshRefinement.computeWorseyFarinSplit()
+    }
+    const weights = this.#boundaryWeightComputer.compute()
+    this.#vertexBoundaryData = weights.vertexBoundaryData
   }
 
   /**
@@ -120,22 +168,10 @@ export class Bcdtpp {
    * @param {number} tIdx
    * @return {number}
    */
-  projectH1(u, point, tIdx) {
-    this.#validateTetIdx(tIdx);
-    const tet = this.mesh.tetrahedra[tIdx];
-    const bary = this.whitney.getBarycentric(tIdx, point);
-
-    let result = 0;
-    for (let i = 0; i < 4; i++) {
-      const vIdx = tet[i];
-      if (this.mesh.boundaryNodes.has(vIdx)) {
-        const alpha = this.#computeBoundaryIntegralH1(vIdx, u);
-        result += alpha * bary[i];
-      } else {
-        result += u(this.mesh.vertices[vIdx]) * bary[i];
-      }
-    }
-    return result;
+  projectH1 (u, point, tIdx) {
+    Bcdtpp.#validatePoint(point)
+    this.#validateTetIdx(tIdx)
+    return this.#h1Projector.project(u, point, tIdx, this.#vertexBoundaryData)
   }
 
   /**
@@ -147,57 +183,10 @@ export class Bcdtpp {
    * @param {number} tIdx
    * @return {!Array<number>}
    */
-  projectHcurl(u, point, tIdx) {
-    this.#validateTetIdx(tIdx);
-    const tet = this.mesh.tetrahedra[tIdx];
-    const bary = this.whitney.getBarycentric(tIdx, point);
-    const edgeBasis = this.whitney.getEdgeBasis(tIdx, bary);
-
-    const localEdges = [
-      [0, 1],
-      [0, 2],
-      [0, 3],
-      [1, 2],
-      [1, 3],
-      [2, 3],
-    ];
-    let result = [0, 0, 0];
-    const vc = this.mesh.originalVertexCount;
-    const edgeKey = (e) => {
-      const a = e[0];
-      const b = e[1];
-      return a < b ? a * vc + b : b * vc + a;
-    };
-
-    for (let e = 0; e < 6; e++) {
-      const [i, j] = localEdges[e];
-      const globalEdge = [tet[i], tet[j]];
-      const eKey = edgeKey(globalEdge);
-      const eIdx = this.mesh.getEdgeIndex(eKey);
-      const sigma = this.mesh.getTetEdgeSign(tIdx, e);
-
-      let coefficient;
-      if (this.mesh.boundaryEdges.includes(eIdx)) {
-        coefficient = this.#computeEdgeDof(u, eIdx);
-      } else {
-        const mid = this.#midpoint(tet[i], tet[j]);
-        const edgeVec = subtract(this.mesh.vertices[tet[j]], this.mesh.vertices[tet[i]]);
-        const val = u(mid);
-        if (typeof val === 'number') {
-          const grad = this.#numericalGradient(u, mid);
-          coefficient = dot(grad, edgeVec);
-        } else {
-          coefficient = dot(val, edgeVec);
-        }
-      }
-
-      coefficient *= sigma;
-      result[0] += coefficient * edgeBasis[e][0];
-      result[1] += coefficient * edgeBasis[e][1];
-      result[2] += coefficient * edgeBasis[e][2];
-    }
-
-    return result;
+  projectHcurl (u, point, tIdx) {
+    Bcdtpp.#validatePoint(point)
+    this.#validateTetIdx(tIdx)
+    return this.#hcurlProjector.project(u, point, tIdx, this.#boundaryEdgeSet)
   }
 
   /**
@@ -209,42 +198,10 @@ export class Bcdtpp {
    * @param {number} tIdx
    * @return {!Array<number>}
    */
-  projectHdiv(u, point, tIdx) {
-    this.#validateTetIdx(tIdx);
-    const tet = this.mesh.tetrahedra[tIdx];
-    const bary = this.whitney.getBarycentric(tIdx, point);
-    const faceBasis = this.whitney.getFaceBasis(tIdx, bary);
-
-    const tFaces = this.mesh.getTetrahedronFaces(tIdx);
-    let result = [0, 0, 0];
-
-    for (let f = 0; f < 4; f++) {
-      const fIdx = tFaces[f];
-      const sigma = this.mesh.getTetFaceSign(tIdx, f);
-
-      let coefficient;
-      if (this.mesh.boundaryFaces.includes(fIdx)) {
-        coefficient = this.#computeFaceDof(u, fIdx);
-      } else {
-        const faceBary = this.mesh.getFaceBarycenter(fIdx);
-        const normal = this.mesh.getFaceOutwardNormal(fIdx);
-        const area = this.mesh.getFaceArea(fIdx);
-        const val = u(faceBary);
-        if (typeof val === 'number') {
-          const grad = this.#numericalGradient(u, faceBary);
-          coefficient = dot(grad, normal) * area;
-        } else {
-          coefficient = dot(val, normal) * area;
-        }
-      }
-
-      coefficient *= sigma;
-      result[0] += coefficient * faceBasis[f][0];
-      result[1] += coefficient * faceBasis[f][1];
-      result[2] += coefficient * faceBasis[f][2];
-    }
-
-    return result;
+  projectHdiv (u, point, tIdx) {
+    Bcdtpp.#validatePoint(point)
+    this.#validateTetIdx(tIdx)
+    return this.#hdivProjector.project(u, point, tIdx, this.#boundaryFaceSet)
   }
 
   /**
@@ -253,20 +210,9 @@ export class Bcdtpp {
    * @param {number} tIdx
    * @return {number}
    */
-  projectL2(u, tIdx) {
-    this.#validateTetIdx(tIdx);
-    const tet = this.mesh.tetrahedra[tIdx];
-    const verts = tet.map((i) => this.mesh.vertices[i]);
-    const vol = this.mesh.getVolume(tIdx);
-    if (vol < 1e-12) {
-      throw new Error(
-        `Cannot perform L2 projection on degenerate tetrahedron ${tIdx}`,
-      );
-    }
-
-    const integrand = (pt) => u(pt);
-    const integral = integrateTetrahedron(verts, integrand, this.quadratureOrder);
-    return integral / vol;
+  projectL2 (u, tIdx) {
+    this.#validateTetIdx(tIdx)
+    return this.#l2Projector.project(u, tIdx)
   }
 
   /**
@@ -276,63 +222,193 @@ export class Bcdtpp {
    * @param {number} tIdx
    * @param {number} l - Form degree (0=H1 scalar, 1=Hcurl vector, 2=Hdiv vector, 3=L2 scalar).
    * @param {number} p
-   * @return {(number|!Array<number>)} Returns a number for l=0 or l=3, and a 3-vector for l=1 or l=2.
+   * @return {(number|!Array<number>)}
    */
-  projectHp(u, point, tIdx, l, p) {
+  projectHp (u, point, tIdx, l, p) {
+    Bcdtpp.#validatePoint(point)
+    this.#validateTetIdx(tIdx)
     if (p === 0) {
       const dispatch = {
         0: () => this.projectH1(u, point, tIdx),
         1: () => this.projectHcurl(u, point, tIdx),
         2: () => this.projectHdiv(u, point, tIdx),
-        3: () => this.projectL2(u, tIdx),
-      };
-      if (!dispatch.hasOwnProperty(l)) {
-        throw new Error(`Invalid form degree l=${l}`);
+        3: () => this.projectL2(u, tIdx)
       }
-      return dispatch[l]();
+      if (!Object.hasOwn(dispatch, l)) {
+        throw new ProjectionError(`Invalid form degree l=${l}`)
+      }
+      return dispatch[l]()
     }
 
     if (l === 0) {
-      const base = this.projectH1(u, point, tIdx);
-      if (p < 4) {
-        return base;
+      if (p === 1) {
+        return this.projectH1(u, point, tIdx)
       }
-      const residualFn = (pt) => u(pt) - base;
-      const coeffs = this.higherOrderProjector.solveBubbleProjection(
+      const bary = this.#whitney.getBarycentric(tIdx, point)
+      const coeffs = this.#higherOrderProjector.solveL2Projection(
         tIdx,
         p,
-        residualFn,
-      );
-      if (coeffs) {
-        const bubble = this.higherOrderProjector.evaluateBubble(
-          tIdx,
-          p,
-          coeffs,
-          point,
-        );
-        return base + bubble;
-      }
-      return base;
+        u
+      )
+      return this.#higherOrderProjector.evaluateL2Projection(
+        coeffs,
+        bary,
+        p
+      )
     }
 
     if (l === 3) {
-      const bary = this.whitney.getBarycentric(tIdx, point);
-      const coeffs = this.higherOrderProjector.solveL2Projection(
+      const bary = this.#whitney.getBarycentric(tIdx, point)
+      const coeffs = this.#higherOrderProjector.solveL2Projection(
         tIdx,
         p,
-        u,
-      );
-      return this.higherOrderProjector.evaluateL2Projection(
+        u
+      )
+      return this.#higherOrderProjector.evaluateL2Projection(
         coeffs,
         bary,
-        p,
-      );
+        p
+      )
     }
 
-    throw new Error(
+    throw new ProjectionError(
       `Higher-order projections for l=${l}, p=${p} not yet implemented. ` +
-        `Only l=0 and l=3 support p>0.`,
-    );
+        'Only l=0 and l=3 support p>0.'
+    )
+  }
+
+  /**
+   * Global projector Pi^l.
+   * @param {function(!Array<number>): (number|!Array<number>)} u
+   * @param {!Array<number>} point
+   * @param {number} tIdx
+   * @param {number} l
+   * @param {number=} p
+   * @return {(number|!Array<number>)}
+   */
+  project (u, point, tIdx, l, p = 0) {
+    Bcdtpp.#validatePoint(point)
+    this.#validateTetIdx(tIdx)
+    if (p !== 0) {
+      return this.projectHp(u, point, tIdx, l, p)
+    }
+    if (l === 3) {
+      return this.projectL2(u, tIdx)
+    }
+    const boundaryData = this.extractBoundaryDofs(u, l)
+    const partial = this.extendBoundary(boundaryData, point, tIdx, l)
+    const samplePt = this.#mesh.getTetrahedronBarycenter(tIdx)
+    const isScalar = typeof u(samplePt) === 'number'
+
+    const w = (l === 0 || !isScalar) ? u : numericalGradient.bind(this, u)
+
+    const v = (pt) => {
+      const valW = w(pt)
+      const valP = this.extendBoundary(boundaryData, pt, tIdx, l)
+      if (typeof valW === 'number') {
+        return valW - valP
+      }
+      return [
+        valW[0] - valP[0],
+        valW[1] - valP[1],
+        valW[2] - valP[2]
+      ]
+    }
+    const ring = this.projectRing(v, point, tIdx, l)
+    if (typeof ring === 'number') {
+      return ring + partial
+    }
+    return [
+      ring[0] + partial[0],
+      ring[1] + partial[1],
+      ring[2] + partial[2]
+    ]
+  }
+
+  /**
+   * Extracts the boundary degrees of freedom for a given function.
+   * @param {function(!Array<number>): (number|!Array<number>)} u
+   * @param {number} l
+   * @return {!Map<number, number>}
+   */
+  extractBoundaryDofs (u, l) {
+    const result = new Map()
+    if (l === 0) {
+      for (const vIdx of this.#mesh.getBoundaryNodes()) {
+        result.set(vIdx, this.#h1Projector.computeBoundaryIntegralH1(vIdx, u, this.#vertexBoundaryData))
+      }
+    } else if (l === 1) {
+      for (const eIdx of this.#mesh.getBoundaryEdges()) {
+        result.set(eIdx, this.#hcurlProjector.computeEdgeDof(u, eIdx))
+      }
+    } else if (l === 2) {
+      for (const fIdx of this.#mesh.getBoundaryFaces()) {
+        result.set(fIdx, this.#hdivProjector.computeFaceDof(u, fIdx))
+      }
+    }
+    return result
+  }
+
+  /**
+   * Pi_ring^l: interior projector with zero boundary trace.
+   * @param {function(!Array<number>): (number|!Array<number>)} u
+   * @param {!Array<number>} point
+   * @param {number} tIdx
+   * @param {number} l
+   * @return {(number|!Array<number>)}
+   */
+  projectRing (u, point, tIdx, l) {
+    Bcdtpp.#validatePoint(point)
+    this.#validateTetIdx(tIdx)
+    const dispatch = {
+      0: () => this.#h1Projector.projectRing(u, point, tIdx),
+      1: () => this.#hcurlProjector.projectRing(u, point, tIdx, this.#boundaryEdgeSet),
+      2: () => this.#hdivProjector.projectRing(u, point, tIdx, this.#boundaryFaceSet),
+      3: () => this.#l2Projector.project(u, tIdx)
+    }
+    if (!Object.hasOwn(dispatch, l)) {
+      throw new ProjectionError(`Invalid form degree l=${l}`)
+    }
+    return dispatch[l]()
+  }
+
+  /**
+   * E^l: discrete extension operator.
+   * @param {!Map<number, number>} boundaryData
+   * @param {!Array<number>} point
+   * @param {number} tIdx
+   * @param {number} l
+   * @return {(number|!Array<number>)}
+   */
+  extendBoundary (boundaryData, point, tIdx, l) {
+    Bcdtpp.#validatePoint(point)
+    this.#validateTetIdx(tIdx)
+    const dispatch = {
+      0: () => this.#h1Projector.extendBoundary(boundaryData, point, tIdx),
+      1: () => this.#hcurlProjector.extendBoundary(boundaryData, point, tIdx, this.#boundaryEdgeSet),
+      2: () => this.#hdivProjector.extendBoundary(boundaryData, point, tIdx, this.#boundaryFaceSet)
+    }
+    if (!Object.hasOwn(dispatch, l)) {
+      throw new ProjectionError(
+        `Discrete extension not defined for form degree l=${l}`
+      )
+    }
+    return dispatch[l]()
+  }
+
+  /**
+   * Pi_partial^l: boundary correction part of the projection.
+   * @param {function(!Array<number>): (number|!Array<number>)} u
+   * @param {!Array<number>} point
+   * @param {number} tIdx
+   * @param {number} l
+   * @return {(number|!Array<number>)}
+   */
+  projectPartial (u, point, tIdx, l) {
+    Bcdtpp.#validatePoint(point)
+    this.#validateTetIdx(tIdx)
+    const boundaryData = this.extractBoundaryDofs(u, l)
+    return this.extendBoundary(boundaryData, point, tIdx, l)
   }
 
   /**
@@ -343,147 +419,22 @@ export class Bcdtpp {
    * @param {number=} p
    * @return {{value: (number|!Array<number>), tIdx: number, bary: !Array<number>}}
    */
-  projectAtPoint(u, point, l = 0, p = 0) {
-    if (!this.pointLocator) {
-      this.buildPointLocator();
+  projectAtPoint (u, point, l = 0, p = 0) {
+    Bcdtpp.#validatePoint(point)
+    if (!this.#pointLocator) {
+      this.buildPointLocator()
     }
-    const found = this.pointLocator.findTetrahedron(point);
+    const found = this.#pointLocator.findTetrahedron(point)
     if (!found) {
-      throw new Error(
-        `Point [${point.join(', ')}] not found in any tetrahedron`,
-      );
+      throw new ProjectionError(
+        `Point [${point.join(', ')}] not found in any tetrahedron`
+      )
     }
-    const {tIdx, bary} = found;
-    const physPoint = barycentricToCartesian(
-      this.mesh.tetrahedra[tIdx].map((i) => this.mesh.vertices[i]),
-      bary,
-    );
+    const { tIdx, bary } = found
     return {
-      value: this.projectHp(u, physPoint, tIdx, l, p),
+      value: this.projectHp(u, point, tIdx, l, p),
       tIdx,
-      bary,
-    };
-  }
-
-  /** @private */
-  #computeBoundaryIntegralH1(vIdx, u) {
-    const data = this.#zeta0Vertex.get(vIdx);
-    if (!data) {
-      return u(this.mesh.vertices[vIdx]);
+      bary
     }
-
-    const {nodeMap, psi} = data;
-    const invNodeMap = new Map(nodeMap.map((id, i) => [id, i]));
-
-    let integral = 0;
-    let zetaIntegral = 0;
-    const starFaces = this.mesh.getBoundaryStar(vIdx);
-
-    starFaces.forEach((fIdx) => {
-      const at = this.meshRefinement.faceToAlfeld.get(fIdx);
-      if (!at) return;
-      at.triangles.forEach((tri) => {
-        const verts = tri.map((i) => this.mesh.vertices[i]);
-        const area = triangleArea(verts[0], verts[1], verts[2]);
-        const localPsi = tri.map((v) => psi[invNodeMap.get(v)]);
-        const {bary, weights} = triangleQuadrature(2);
-        let triIntegral = 0;
-        let triZetaIntegral = 0;
-        for (let q = 0; q < bary.length; q++) {
-          const pt = barycentricToCartesian(verts, bary[q]);
-          const zeta =
-            localPsi[0] * bary[q][0] +
-            localPsi[1] * bary[q][1] +
-            localPsi[2] * bary[q][2];
-          triIntegral += weights[q] * u(pt) * zeta;
-          triZetaIntegral += weights[q] * zeta;
-        }
-        integral += triIntegral * area;
-        zetaIntegral += triZetaIntegral * area;
-      });
-    });
-
-    if (Math.abs(zetaIntegral) < 1e-12) {
-      return u(this.mesh.vertices[vIdx]);
-    }
-    return integral / zetaIntegral;
   }
-
-  /**
-   * Computes the exact edge DoF for H(curl): ∫_e u·t ds.
-   * For scalar u, this reduces to u(v1) - u(v0) (the fundamental theorem).
-   * @param {function(!Array<number>): (number|!Array<number>)} u
-   * @param {number} eIdx
-   * @return {number}
-   * @private
-   */
-  #computeEdgeDof(u, eIdx) {
-    const e = this.mesh.edges[eIdx];
-    const v0 = this.mesh.vertices[e[0]];
-    const v1 = this.mesh.vertices[e[1]];
-    const edgeVec = subtract(v1, v0);
-
-    if (typeof u(v0) === 'number') {
-      return u(v1) - u(v0);
-    }
-
-    const {points, weights} = lineQuadrature(this.quadratureOrder);
-    let integral = 0;
-    for (let q = 0; q < points.length; q++) {
-      const s = points[q];
-      const pt = [
-        v0[0] + s * edgeVec[0],
-        v0[1] + s * edgeVec[1],
-        v0[2] + s * edgeVec[2],
-      ];
-      integral += weights[q] * dot(u(pt), edgeVec);
-    }
-    return integral;
-  }
-
-  /**
-   * Computes the exact face DoF for H(div): ∫_f u·n dA.
-   * For scalar u, this integrates grad(u)·n over the face.
-   * @param {function(!Array<number>): (number|!Array<number>)} u
-   * @param {number} fIdx
-   * @return {number}
-   * @private
-   */
-  #computeFaceDof(u, fIdx) {
-    const f = this.mesh.faces[fIdx];
-    const verts = f.map((i) => this.mesh.vertices[i]);
-    const normal = this.mesh.getFaceOutwardNormal(fIdx);
-    const area = triangleArea(verts[0], verts[1], verts[2]);
-    const {bary, weights} = triangleQuadrature(this.quadratureOrder);
-
-    const isScalar = typeof u(verts[0]) === 'number';
-    let integral = 0;
-    for (let q = 0; q < bary.length; q++) {
-      const pt = barycentricToCartesian(verts, bary[q]);
-      if (isScalar) {
-        const grad = this.#numericalGradient(u, pt);
-        integral += weights[q] * dot(grad, normal);
-      } else {
-        integral += weights[q] * dot(u(pt), normal);
-      }
-    }
-    return integral * area;
-  }
-
-  /** @private */
-  #numericalGradient(u, pt, h = 1e-6) {
-    return [
-      (u([pt[0] + h, pt[1], pt[2]]) - u([pt[0] - h, pt[1], pt[2]])) / (2 * h),
-      (u([pt[0], pt[1] + h, pt[2]]) - u([pt[0], pt[1] - h, pt[2]])) / (2 * h),
-      (u([pt[0], pt[1], pt[2] + h]) - u([pt[0], pt[1], pt[2] - h])) / (2 * h),
-    ];
-  }
-
-  /** @private */
-  #midpoint(vI, vJ) {
-    const a = this.mesh.vertices[vI];
-    const b = this.mesh.vertices[vJ];
-    return [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2];
-  }
-
 }
