@@ -34,3 +34,9 @@ If applicable, add a minimal code snippet that reproduces the issue.
 
 **Additional context**
 Add any other context about the problem here.
+
+**Checklist**
+- [ ] I have searched existing issues to ensure this is not a duplicate
+- [ ] I have provided a minimal reproduction case
+- [ ] I have included the relevant environment details
+- [ ] I can reproduce this issue on a clean install

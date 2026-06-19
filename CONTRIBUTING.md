@@ -26,17 +26,69 @@ npm run docs        # Regenerate API documentation
 
 All contributions must pass lint and tests before being merged.
 
+## Commit Conventions
+
+We follow [Conventional Commits](https://www.conventionalcommits.org/) for commit messages. This enables automatic changelog generation and semantic versioning.
+
+### Format
+
+```
+<type>(<scope>): <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+### Types
+
+- **feat**: A new feature
+- **fix**: A bug fix
+- **docs**: Documentation only changes
+- **style**: Code style changes (formatting, missing semi-colons, etc.)
+- **refactor**: Code change that neither fixes a bug nor adds a feature
+- **perf**: Performance improvement
+- **test**: Adding missing tests or correcting existing tests
+- **chore**: Build process or auxiliary tool changes
+- **ci**: CI configuration changes
+- **revert**: Revert a previous commit
+
+### Examples
+
+```bash
+git commit -m "feat(mesh): add anisotropic mesh support"
+git commit -m "fix(point-locator): correct barycentric coordinate calculation"
+git commit -m "docs: update API reference for Bcdtpp class"
+git commit -m "test(bcdtpp): add edge cases for degenerate tetrahedra"
+git commit -m "chore: update rollup to v4"
+```
+
+### Scope
+
+Optional scope should reference the module affected:
+
+- `mesh` - Mesh topology and geometry
+- `whitney` - Whitney forms and barycentric utilities
+- `bcdtpp` - Main projection class
+- `point-locator` - AABB tree point location
+- `quadrature` - Gaussian quadrature
+- `math-utils` - Linear algebra primitives
+- `local-solver` - Boundary-patch assembly
+- `higher-order` - Higher-order projection
+- `docs` - Documentation
+
 ## Pull Request Process
 
 1. Create a feature branch from `master`:
    ```bash
-   git checkout -b feature/my-change
+   git checkout -b feat/my-change
    ```
 2. Make your changes, add tests, and ensure `npm test` passes.
 3. Run `npm run lint:fix` to auto-format.
-4. Commit with a clear message describing the change.
+4. Commit with a conventional commit message describing the change.
 5. Push to your fork and open a Pull Request against `master`.
 6. Fill out the PR template with a summary and test plan.
+7. Ensure CI passes and request a review from a maintainer.
 
 ## Reporting Bugs
 

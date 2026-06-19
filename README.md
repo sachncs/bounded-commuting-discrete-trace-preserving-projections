@@ -1,8 +1,10 @@
 # Bcdtpp.js
 
 [![CI](https://github.com/sachn-cs/bounded-commuting-discrete-trace-preserving-projections/actions/workflows/ci.yml/badge.svg)](https://github.com/sachn-cs/bounded-commuting-discrete-trace-preserving-projections/actions/workflows/ci.yml)
-[![JavaScript Style Guide](https://img.shields.io/badge/code_style-standard-brightgreen.svg)](https://standardjs.com)
+[![npm version](https://img.shields.io/npm/v/bcdtpp.svg)](https://www.npmjs.com/package/bcdtpp)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![JavaScript Style Guide](https://img.shields.io/badge/code_style-standard-brightgreen.svg)](https://standardjs.com)
+[![Node.js Version](https://img.shields.io/node/v/bcdtpp)](https://nodejs.org)
 
 JavaScript implementation of **Bounded, Commuting, Discrete-trace Preserving Projections** for the 3D de Rham complex on simplicial meshes.
 

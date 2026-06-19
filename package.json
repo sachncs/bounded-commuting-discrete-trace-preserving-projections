@@ -4,6 +4,28 @@
   "description": "Bounded, Commuting, Discrete-trace Preserving Projections for the 3D de Rham complex on simplicial meshes.",
   "type": "module",
   "main": "src/lib/bcdtpp.js",
+  "homepage": "https://github.com/sachn-cs/bounded-commuting-discrete-trace-preserving-projections#readme",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sachn-cs/bounded-commuting-discrete-trace-preserving-projections.git"
+  },
+  "bugs": {
+    "url": "https://github.com/sachn-cs/bounded-commuting-discrete-trace-preserving-projections/issues"
+  },
+  "author": "Sachin",
+  "license": "MIT",
+  "keywords": [
+    "finite-element-method",
+    "de-rham-complex",
+    "whitney-forms",
+    "simplicial-mesh",
+    "tetrahedral-mesh",
+    "projection",
+    "hodge-star",
+    "discrete-operators",
+    "scientific-computing",
+    "numerical-analysis"
+  ],
   "module": "dist/bcdtpp.esm.js",
   "unpkg": "dist/bcdtpp.umd.js",
   "jsdelivr": "dist/bcdtpp.umd.js",
