@@ -74,7 +74,7 @@
     "build:full": "npm run build && npm run docs"
   },
   "devDependencies": {
-    "@babel/core": "^7.29.0",
+    "@babel/core": "^8.0.1",
     "@babel/preset-env": "^7.29.5",
     "@rollup/plugin-babel": "^7.0.0",
     "@rollup/plugin-commonjs": "^29.0.2",
