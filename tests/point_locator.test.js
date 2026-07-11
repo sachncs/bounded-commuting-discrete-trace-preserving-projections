@@ -1,9 +1,16 @@
+/**
+ * Tests for the PointLocator AABB tree: interior/vertex/boundary queries,
+ * multi-tet meshes, tree partitioning on larger meshes, and degenerate
+ * tet rejection at construction time.
+ */
 import { expect } from 'chai'
 import { PointLocator } from '../src/lib/point_locator.js'
 import { Mesh } from '../src/lib/mesh.js'
 import { MeshValidationError } from '../src/lib/errors.js'
 import { generateUnitCubeMesh } from '../src/lib/mesh_generator.js'
 
+// Tests the AABB tree point-in-tet locator on single-tet, two-tet,
+// and multi-tet (cube) meshes, plus tree partitioning behavior.
 describe('PointLocator', () => {
   const singleTet = {
     vertices: [[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]],

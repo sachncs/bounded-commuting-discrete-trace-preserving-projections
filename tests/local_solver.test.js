@@ -1,11 +1,20 @@
+/**
+ * Tests for the LocalSolver static methods: surface stiffness assembly
+ * (symmetry, degenerate-triangle rejection) and constrained solve
+ * (ill-conditioning warning, singularity detection, edge cases).
+ */
 import { expect } from 'chai'
 import sinon from 'sinon'
 import { LocalSolver } from '../src/lib/local_solver.js'
 import { SingularMatrixError } from '../src/lib/errors.js'
 
+// Tests for LocalSolver: surface stiffness symmetry, ill-conditioning
+// detection, singular matrix rejection, and degenerate triangle handling.
 describe('LocalSolver', () => {
   afterEach(() => sinon.restore())
 
+  // Tolerance 1e-10: compares K[i][j] to K[j][i] for floating-point
+  // symmetry; 1e-10 accounts for round-off from double-precision arithmetic.
   it('assembleSurfaceStiffness returns symmetric matrix', () => {
     const vertices = [[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]]
     const triangles = [[0, 1, 2], [0, 1, 3], [0, 2, 3], [1, 2, 3]]

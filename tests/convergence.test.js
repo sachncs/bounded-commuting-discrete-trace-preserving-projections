@@ -1,3 +1,7 @@
+/**
+ * Mesh generator validation, convergence harness utilities, and h-/p-convergence
+ * rate tests for all four de Rham projection operators (H1, Hcurl, Hdiv, L2).
+ */
 import { expect } from 'chai'
 import { Whitney } from '../src/lib/whitney.js'
 import { Bcdtpp } from '../src/lib/bcdtpp.js'
@@ -14,6 +18,8 @@ import {
   runConvergenceStudy
 } from '../src/lib/convergence_harness.js'
 
+// Verifies the mesh generator produces valid tetrahedral meshes
+// with correct counts for various subdivision levels.
 describe('Mesh Generator', () => {
   it('generates a valid single-cube mesh with 6 tets', () => {
     const mesh = generateUnitCubeMesh(1)
@@ -40,6 +46,8 @@ describe('Mesh Generator', () => {
   })
 })
 
+// Tests the convergence study utilities: mesh size estimation, rate
+// calculation, and runConvergenceStudy orchestration for all form degrees.
 describe('Convergence Harness Utilities', () => {
   it('estimateMeshSize returns positive for a cube mesh', () => {
     const mesh = generateUnitCubeMesh(2)
@@ -134,6 +142,9 @@ describe('Convergence Harness Utilities', () => {
   })
 })
 
+// p-refinement tests on a single tet: verifies that increasing the
+// polynomial degree p reduces L2 error for the H1 (l=0) and L2 (l=3)
+// projectors on a quadratic test function.
 describe('p-Convergence on Single Tet', () => {
   const mesh = generateSingleTetMesh()
   const whitney = new Whitney(mesh)
@@ -169,6 +180,10 @@ describe('p-Convergence on Single Tet', () => {
   })
 })
 
+// h-refinement tests on cube meshes: verifies that mesh refinement
+// (h → 0) yields the expected convergence rates for each projection
+// operator.  Pre-asymptotic rates on coarse all-boundary meshes may
+// be lower due to imprecise boundary weights.
 describe('h-Convergence on Cube Meshes', () => {
   const exactScalar = (pt) =>
     Math.sin(Math.PI * pt[0]) *

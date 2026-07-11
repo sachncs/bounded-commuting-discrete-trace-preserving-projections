@@ -1,8 +1,16 @@
+/**
+ * Core projection correctness tests for the Bcdtpp class on a single
+ * tetrahedron.  Verifies exactness for constants/linears, commuting
+ * properties (grad Pi^0 = 0, div Pi^2 = Pi^3 div), and higher-order
+ * enrichment behavior.
+ */
 import { expect } from 'chai'
 import { Mesh } from '../src/lib/mesh.js'
 import { Whitney } from '../src/lib/whitney.js'
 import { Bcdtpp } from '../src/lib/bcdtpp.js'
 
+// Single-tet mesh: all 4 vertices are boundary, which exercises the
+// boundary-weight machinery for every projection.
 describe('Bcdtpp Projections', () => {
   const singleTet = {
     vertices: [[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]],
@@ -90,6 +98,9 @@ describe('Bcdtpp Projections', () => {
     expect(() => bcdtpp.projectAtPoint(u, [5, 5, 5], 0)).to.throw(/not found/)
   })
 
+  // Tolerance 1e-6: numerical gradient finite-difference approximation
+  // (h=1e-5) introduces O(h^2) error; 1e-5 is chosen so the expected
+  // gradient of a constant (0) is within 1e-5 of machine zero.
   it('commuting property: grad Pi^0 = 0 for constant function', () => {
     const u = () => 7
     const pt = [0.2, 0.1, 0.05]
@@ -120,6 +131,9 @@ describe('Bcdtpp Projections', () => {
     expect(proj[2]).to.be.closeTo(c[2], Math.pow(10, -1))
   })
 
+  // Tolerance 1e-1: on a single-tet all-boundary mesh, the discrete div
+  // approximation via finite differences (h=1e-5) is inherently imprecise
+  // for the H(div) projector; a looser tolerance is expected.
   it('commuting property: div Pi^2 ≈ Pi^3 div for constant divergence', () => {
     const v = (pt) => [2 * pt[0], 2 * pt[1], 2 * pt[2]]
     const pt = mesh.getTetrahedronBarycenter(0)

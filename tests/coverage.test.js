@@ -1,3 +1,9 @@
+/**
+ * Broad coverage and edge-case tests: multi-tet projection correctness,
+ * mesh validation errors, higher-order edge cases, singular-matrix handling,
+ * BoundaryWeightComputer fault isolation, and scalar-to-vector projection
+ * interoperability.
+ */
 import { expect } from 'chai'
 import sinon from 'sinon'
 import { Mesh } from '../src/lib/mesh.js'
@@ -10,6 +16,8 @@ import { MeshValidationError } from '../src/lib/errors.js'
 import { factorial } from '../src/lib/math_utils.js'
 import { generateUnitCubeMesh } from '../src/lib/mesh_generator.js'
 
+// Multi-tet mesh: exercises projection across shared faces/edges and
+// verifies commuting properties hold element-by-element.
 describe('Multi-tet Bcdtpp Projections', () => {
   const twoTet = {
     vertices: [[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1], [1, 1, 1]],
@@ -63,6 +71,9 @@ describe('Multi-tet Bcdtpp Projections', () => {
     }
   })
 
+  // Tolerance 1e-1: numerical divergence via finite differences (h=1e-5)
+  // on the projected field introduces O(h) discretization error; 1e-1
+  // accommodates the compounded error from projection + finite difference.
   it('commutes div Pi^2 = Pi^3 div on multi-tet mesh', () => {
     const v = (pt) => [2 * pt[0], 2 * pt[1], 2 * pt[2]]
     const divV = () => 6
@@ -95,6 +106,7 @@ describe('Multi-tet Bcdtpp Projections', () => {
   })
 })
 
+// Verifies that Mesh throws MeshValidationError for various invalid inputs.
 describe('Mesh Validation', () => {
   it('throws MeshValidationError for negative orientation', () => {
     expect(() => new Mesh(
@@ -143,6 +155,8 @@ describe('Mesh Validation', () => {
   })
 })
 
+// Tests edge cases in the higher-order projection framework: p=1 fallback
+// to lowest-order, p=2,3 L2 enrichment for H^1, and unimplemented l=1,2 p>0.
 describe('Higher-Order Edge Cases', () => {
   const singleTet = {
     vertices: [[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]],
@@ -196,6 +210,7 @@ describe('Higher-Order Edge Cases', () => {
   })
 })
 
+// Verifies ProjectionError is thrown for invalid arguments to projection methods.
 describe('Projection Error Handling', () => {
   const singleTet = {
     vertices: [[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]],
@@ -235,6 +250,8 @@ describe('Projection Error Handling', () => {
   })
 })
 
+// Tests the HigherOrderProjection bubble solve path, including singular
+// matrix fault injection via sinon stubs.
 describe('Bubble Projection', () => {
   afterEach(() => sinon.restore())
 
@@ -327,6 +344,8 @@ describe('Bubble Projection', () => {
   })
 })
 
+// Verifies that BoundaryWeightComputer isolates per-vertex failures:
+// zero star area and adjacency exceptions emit warnings instead of throwing.
 describe('BoundaryWeightComputer fault isolation', () => {
   afterEach(() => sinon.restore())
 
@@ -372,6 +391,8 @@ describe('BoundaryWeightComputer fault isolation', () => {
   })
 })
 
+// Tests that H(curl) and H(div) projectors accept scalar functions
+// (which are internally promoted to vector fields via numerical gradient).
 describe('Scalar inputs to vector projections', () => {
   const cubeMesh = generateUnitCubeMesh(2)
   let whitney
@@ -402,6 +423,7 @@ describe('Scalar inputs to vector projections', () => {
   })
 })
 
+// Verifies that Mesh rejects degenerate (coplanar/collinear) tetrahedra.
 describe('Whitney degenerate tet handling', () => {
   it('rejects degenerate tet at mesh construction', () => {
     expect(() => new Mesh(

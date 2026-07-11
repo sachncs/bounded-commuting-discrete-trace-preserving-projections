@@ -1,3 +1,9 @@
+/**
+ * Tests for pure JavaScript linear algebra and vector utilities:
+ * dot/cross products, norms, matrix operations, LU solver with partial
+ * pivoting, 3x3 inverse and solve, tetrahedron determinant/volume,
+ * factorial bounds, and numerical gradient approximation.
+ */
 import { expect } from 'chai'
 import {
   dot,

@@ -1,7 +1,14 @@
+/**
+ * Tests for the Whitney class: barycentric coordinate computation,
+ * gradient properties (sum-to-zero), edge basis (Nedelec, 6 components),
+ * face basis (Raviart-Thomas, 4 components), and degenerate-tet rejection.
+ */
 import { expect } from 'chai'
 import { Whitney } from '../src/lib/whitney.js'
 import { Mesh } from '../src/lib/mesh.js'
 
+// Tests barycentric coordinates, their gradient properties, Whitney
+// edge/face basis dimensions, and degenerate-tet rejection.
 describe('Whitney', () => {
   const singleTet = {
     vertices: [[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]],

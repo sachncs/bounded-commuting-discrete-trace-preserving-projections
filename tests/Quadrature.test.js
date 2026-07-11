@@ -1,3 +1,9 @@
+/**
+ * Tests for Gaussian quadrature rules on triangles, tetrahedra, and lines.
+ * Verifies exactness at each quadrature order for polynomial integrands
+ * of the appropriate degree, and barycentric-to-Cartesian coordinate
+ * conversion.
+ */
 import { expect } from 'chai'
 import {
   integrateTriangle,
@@ -6,6 +12,9 @@ import {
   lineQuadrature
 } from '../src/lib/quadrature.js'
 
+// Verifies exactness of Gaussian quadrature at each supported order.
+// Tolerance 1e-10 is used for exact analytical values (machine epsilon
+// level for well-conditioned quadrature weights).
 describe('Quadrature', () => {
   it('triangle order 1 integrates constants exactly', () => {
     const verts = [[0, 0, 0], [1, 0, 0], [0, 1, 0]]

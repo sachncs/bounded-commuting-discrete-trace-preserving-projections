@@ -1,7 +1,14 @@
+/**
+ * Tests for the Mesh and MeshRefinement classes: topology construction
+ * (faces, edges, boundary), geometry (volume, normals), orientation
+ * signs, vertex stars, and Alfeld/Worsey-Farin split idempotency.
+ */
 import { expect } from 'chai'
 import { Mesh } from '../src/lib/mesh.js'
 import { MeshRefinement } from '../src/lib/mesh_refinement.js'
 
+// Verifies Mesh topology construction: faces, edges, boundary sets,
+// volume, orientation signs, vertex stars, and multi-tet connectivity.
 describe('Mesh', () => {
   const singleTet = {
     vertices: [[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]],
@@ -67,6 +74,8 @@ describe('Mesh', () => {
   })
 })
 
+// Verifies Alfeld and Worsey-Farin mesh refinement: split counts,
+// sub-triangle/tet counts, and idempotency of both splits.
 describe('MeshRefinement', () => {
   const singleTet = {
     vertices: [[0, 0, 0], [1, 0, 0], [0, 1, 0], [0, 0, 1]],

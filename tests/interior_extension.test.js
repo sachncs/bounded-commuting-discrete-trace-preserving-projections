@@ -1,3 +1,9 @@
+/**
+ * Tests for the interior projector (Pi_ring^l), discrete extension operator
+ * (E^l), their decomposition (Pi^l = Pi_ring^l + Pi_partial^l), commuting
+ * diagram properties (tr^l(E^l(w)) = w), and the global projector dispatch
+ * on both single-tet and multi-tet meshes.
+ */
 import { expect } from 'chai'
 import { Mesh } from '../src/lib/mesh.js'
 import { Whitney } from '../src/lib/whitney.js'
@@ -9,6 +15,8 @@ const singleTet = {
   tetrahedra: [[0, 1, 2, 3]]
 }
 
+// Pi_ring^l: verifies that the interior projector vanishes on boundary
+// for all form degrees (H1, Hcurl, Hdiv, L2) on a single tet.
 describe('Pi_ring^l interior projector', () => {
   let mesh
   let whitney
@@ -25,8 +33,7 @@ describe('Pi_ring^l interior projector', () => {
     const u = (pt) => 2 * pt[0] - 3 * pt[1] + 5 * pt[2]
     const pt = mesh.getTetrahedronBarycenter(0)
     const result = bcdtpp.projectRing(u, pt, 0, 0)
-    // On a single tet all vertices are boundary, so projectRing = 0.
-    // Wait: a single tet mesh has no interior vertices. All 4 vertices are boundary.
+    // On a single tet all vertices are boundary, so projectRing returns 0.
     expect(result).to.equal(0)
   })
 
@@ -94,6 +101,8 @@ describe('Pi_ring^l interior projector', () => {
   })
 })
 
+// E^l: verifies that the discrete extension operator preserves boundary
+// DoF values exactly for H1 and Hcurl on a single tet.
 describe('Discrete extension operator E^l', () => {
   let mesh
   let whitney
@@ -166,6 +175,8 @@ describe('Discrete extension operator E^l', () => {
   })
 })
 
+// Verifies the fundamental decomposition Pi^l = Pi_ring^l + Pi_partial^l
+// for all three vector-valued form degrees (H1, Hcurl, Hdiv).
 describe('Decomposition Pi^l = Pi_ring^l + Pi_partial^l', () => {
   let mesh
   let whitney
@@ -210,6 +221,8 @@ describe('Decomposition Pi^l = Pi_ring^l + Pi_partial^l', () => {
   })
 })
 
+// Interior projector and extension operator on a multi-tet cube mesh,
+// verifying trace-vanishing properties on boundary.
 describe('Interior projector on multi-tet mesh', () => {
   let mesh
   let whitney
@@ -277,6 +290,8 @@ describe('Interior projector on multi-tet mesh', () => {
   })
 })
 
+// Extension operator on a multi-tet cube mesh, verifying exactness
+// at boundary vertices/edges and the projectPartial decomposition.
 describe('Extension operator on multi-tet mesh', () => {
   let mesh
   let whitney
@@ -352,6 +367,8 @@ describe('Extension operator on multi-tet mesh', () => {
   })
 })
 
+// Verifies commuting diagram properties: tr^l(E^l(w)) = w for all
+// form degrees (H1 vertex trace, Hcurl tangential trace).
 describe('Commuting diagrams for ring + extension', () => {
   let mesh
   let whitney
@@ -425,6 +442,8 @@ describe('Commuting diagrams for ring + extension', () => {
   })
 })
 
+// Global projector dispatch: verifies that project() with l,p arguments
+// delegates to the correct specialized projection method.
 describe('Global projector Pi^l', () => {
   let mesh
   let whitney
