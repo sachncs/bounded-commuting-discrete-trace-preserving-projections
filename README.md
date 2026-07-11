@@ -1,12 +1,14 @@
-# Bcdtpp.js
-
-[![CI](https://github.com/sachn-cs/bounded-commuting-discrete-trace-preserving-projections/actions/workflows/ci.yml/badge.svg)](https://github.com/sachn-cs/bounded-commuting-discrete-trace-preserving-projections/actions/workflows/ci.yml)
-[![npm version](https://img.shields.io/npm/v/bcdtpp.svg)](https://www.npmjs.com/package/bcdtpp)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![JavaScript Style Guide](https://img.shields.io/badge/code_style-standard-brightgreen.svg)](https://standardjs.com)
-[![Node.js Version](https://img.shields.io/node/v/bcdtpp)](https://nodejs.org)
-
-JavaScript implementation of **Bounded, Commuting, Discrete-trace Preserving Projections** for the 3D de Rham complex on simplicial meshes.
+<p align="center">
+  <h1 align="center">bcdtpp</h1>
+  <p align="center">Bounded, Commuting, Discrete-trace Preserving Projections for the 3D de Rham complex on simplicial meshes.</p>
+  <p align="center">
+    <a href="#installation"><img src="https://img.shields.io/npm/v/bcdtpp.svg" alt="npm version"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green" alt="License"></a>
+    <a href="https://github.com/sachncs/bounded-commuting-discrete-trace-preserving-projections/actions"><img src="https://img.shields.io/github/actions/workflow/status/sachncs/bounded-commuting-discrete-trace-preserving-projections/ci.yml?branch=master" alt="CI"></a>
+    <a href="https://www.npmjs.com/package/bcdtpp"><img src="https://img.shields.io/npm/dm/bcdtpp" alt="Downloads"></a>
+    <a href="https://standardjs.com"><img src="https://img.shields.io/badge/code_style-standard-brightgreen" alt="StandardJS"></a>
+  </p>
+</p>
 
 Based on the paper: [*Ern, Guzmán, Potu (2026) arXiv:2604.28103v1*](https://arxiv.org/abs/2604.28103).
 
@@ -147,7 +149,7 @@ The UMD bundle is available via CDN:
 ```html
 <script src="https://cdn.jsdelivr.net/npm/bcdtpp/dist/bcdtpp.umd.js"></script>
 <script>
-  const { Mesh, Whitney, Bcdtpp } = window.bcdtpp
+  const { Mesh, Whitney, Bcdtpp } = window.Bcdtpp
 </script>
 ```
 
@@ -157,6 +159,17 @@ The UMD bundle is available via CDN:
 - **Point location**: `O(log T)` per query after AABB tree construction.
 - **Boundary weight computation**: `O(V * k)` where `k` is the typical boundary-patch size; this is the dominant upfront cost.
 - **Per-element projection**: `O(1)` for lowest-order; `O(p^3)` for higher-order scalar enrichment.
+
+## Tech Stack
+
+| Category | Technology |
+|----------|------------|
+| Language | JavaScript (ES2022) |
+| Build | [Rollup](https://rollupjs.org/) (ESM + CJS + UMD) |
+| Lint | [StandardJS](https://standardjs.com/) |
+| Testing | [Mocha](https://mochajs.org/) + [Chai](https://www.chaijs.com/) |
+| Coverage | [c8](https://github.com/bcoe/c8) |
+| CI | [GitHub Actions](https://github.com/features/actions) |
 
 ## Development
 
@@ -249,6 +262,15 @@ See [CHANGELOG.md](CHANGELOG.md) for a detailed history of releases and breaking
 
 Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
 
+## Code of Conduct
+
+This project follows the [Contributor Covenant v2.1](CODE_OF_CONDUCT.md).
+By participating you agree to abide by its terms.
+
+## Security
+
+Report vulnerabilities to **sachncs@gmail.com** — see [SECURITY.md](SECURITY.md).
+
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE) © 2026 Sachin
