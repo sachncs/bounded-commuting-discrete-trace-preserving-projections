@@ -7,6 +7,14 @@
 import { triangleQuadrature, barycentricToCartesian } from '../quadrature.js'
 import { triangleArea } from '../math_utils.js'
 
+/**
+ * Lowest-order H1 (l=0) vertex-based projector implementing Pi^0.
+ *
+ * Projects scalar functions onto the space of continuous piecewise-linear
+ * functions (P1 Lagrange) on a tetrahedral mesh.  Boundary vertices use
+ * weighted surface-patch integrals (computed by {@link BoundaryWeightComputer})
+ * to ensure trace preservation.  Interior vertices use nodal interpolation.
+ */
 export class H1Projector {
   /**
    * @param {!Mesh} mesh

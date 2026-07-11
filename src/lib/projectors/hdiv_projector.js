@@ -8,6 +8,13 @@ import { dot, cross, subtract, norm, numericalGradient, triangleArea } from '../
 import { triangleQuadrature, barycentricToCartesian } from '../quadrature.js'
 import { ProjectionError } from '../errors.js'
 
+/**
+ * Lowest-order H(div) (l=2) face-based projector implementing Pi^2.
+ *
+ * Projects vector functions onto the Raviart-Thomas (Whitney 2-form) space.
+ * Boundary faces use exact normal-flux degrees of freedom (∫_f u·n dA);
+ * interior faces use barycenter evaluation of the normal component.
+ */
 export class HdivProjector {
   /**
    * @param {!Mesh} mesh

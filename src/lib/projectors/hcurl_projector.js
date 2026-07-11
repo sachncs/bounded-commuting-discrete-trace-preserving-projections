@@ -7,6 +7,14 @@
 import { dot, subtract, numericalGradient } from '../math_utils.js'
 import { lineQuadrature } from '../quadrature.js'
 
+/**
+ * Lowest-order H(curl) (l=1) edge-based projector implementing Pi^1.
+ *
+ * Projects vector functions onto the Nédélec first-kind (Whitney 1-form)
+ * space.  Boundary edges use exact tangential-trace degrees of freedom
+ * (∫_e u·t ds); interior edges use midpoint evaluation of the tangential
+ * component.
+ */
 export class HcurlProjector {
   /**
    * @param {!Mesh} mesh

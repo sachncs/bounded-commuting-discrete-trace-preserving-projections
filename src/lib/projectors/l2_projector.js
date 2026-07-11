@@ -7,6 +7,13 @@
 import { integrateTetrahedron } from '../quadrature.js'
 import { ProjectionError } from '../errors.js'
 
+/**
+ * Lowest-order L2 (l=3) cell-based projector implementing Pi^3.
+ *
+ * Projects scalar functions onto the space of piecewise constants (P0)
+ * on a tetrahedral mesh.  The projection is simply the volume-weighted
+ * average of the function over each tetrahedron.
+ */
 export class L2Projector {
   /**
    * @param {!Mesh} mesh
