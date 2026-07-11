@@ -121,11 +121,17 @@ export class Bcdtpp {
     }
   }
 
-  /** Quadrature order used for integrations. */
+  /** Quadrature order used for integrations. @return {number} */
   get quadratureOrder () {
     return this.#quadratureOrder
   }
 
+  /**
+   * Builds the AABB point locator for O(log N) point-in-tet queries.
+   *
+   * Called automatically by {@link projectAtPoint} if not already built.
+   * Must be called before any operation that requires spatial queries.
+   */
   buildPointLocator () {
     this.#pointLocator = new PointLocator(this.#mesh)
   }
@@ -152,7 +158,15 @@ export class Bcdtpp {
     }
   }
 
-  /** Section 6.3.1: Construction of lowest-order vertex weights. */
+  /**
+   * Section 6.3.1: Computes boundary vertex weights for trace-preserving
+   * projections.
+   *
+   * Triggers the Alfeld/Worsey-Farin mesh split if not already done, then
+   * delegates to {@link BoundaryWeightComputer}.  Must be called before any
+   * projection method that uses boundary-aware DoFs (projectH1, projectHcurl,
+   * projectHdiv).
+   */
   computeBoundaryWeights () {
     if (this.#meshRefinement.alfeldTriangles.length === 0) {
       this.#meshRefinement.computeWorseyFarinSplit()
@@ -278,7 +292,15 @@ export class Bcdtpp {
   }
 
   /**
-   * Global projector Pi^l.
+   * Global projector Pi^l implementing the decomposition:
+   *
+   *   Pi^l = Pi_partial^l + Pi_ring^l (I - Pi_partial^l)
+   *
+   * where Pi_partial^l is the boundary correction (discrete extension of
+   * boundary DoFs) and Pi_ring^l is the interior projector with zero
+   * boundary trace.  This decomposition guarantees both commuting with
+   * exterior derivatives and preservation of discrete traces.
+   *
    * @param {function(!Array<number>): (number|!Array<number>)} u
    * @param {!Array<number>} point
    * @param {number} tIdx
@@ -295,8 +317,14 @@ export class Bcdtpp {
     if (l === 3) {
       return this.projectL2(u, tIdx)
     }
+
+    // Step 1: Extract boundary DoFs (nodal values, line integrals, or fluxes).
     const boundaryData = this.extractBoundaryDofs(u, l)
+
+    // Step 2: Pi_partial^l — discrete extension of boundary data into the element.
     const partial = this.extendBoundary(boundaryData, point, tIdx, l)
+
+    // Step 3: Pi_ring^l — project the residual (u - Pi_partial^l) on interior DoFs.
     const samplePt = this.#mesh.getTetrahedronBarycenter(tIdx)
     const isScalar = typeof u(samplePt) === 'number'
 
@@ -315,6 +343,8 @@ export class Bcdtpp {
       ]
     }
     const ring = this.projectRing(v, point, tIdx, l)
+
+    // Step 4: Combine: Pi^l = Pi_partial^l + Pi_ring^l(I - Pi_partial^l).
     if (typeof ring === 'number') {
       return ring + partial
     }

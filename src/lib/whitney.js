@@ -5,6 +5,15 @@
 import { cross, inverse3x3, tetDeterminant } from './math_utils.js'
 import { ProjectionError } from './errors.js'
 
+/**
+ * Barycentric coordinate computation and Whitney finite-element basis
+ * functions on a tetrahedral mesh.
+ *
+ * Provides the Whitney 1-forms (Nedelec edge basis) and 2-forms
+ * (Raviart-Thomas face basis) used by the H(curl) and H(div) projectors.
+ * All per-tet geometry (edge matrix, inverse, gradients) is cached at
+ * construction time for efficient repeated evaluation.
+ */
 export class Whitney {
   /** @type {!Array<!Array<!Array<number>>|undefined>} */
   #gradLCache

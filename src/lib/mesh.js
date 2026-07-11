@@ -1,3 +1,13 @@
+/**
+ * Tetrahedral mesh data structure with topological connectivity, geometry,
+ * and boundary extraction.
+ *
+ * This module provides the core Mesh class used throughout the BCDTPP library.
+ * The Mesh is constructed once and treated as immutable for the duration of a
+ * projection computation.  Mesh refinement operators (Alfeld split,
+ * Worsey-Farin split) live in a separate {@link MeshRefinement} class.
+ */
+
 import { triangleArea, tetDeterminant, tetVolume } from './math_utils.js'
 import { MeshValidationError } from './errors.js'
 
@@ -499,56 +509,64 @@ export class Mesh {
   }
 
   /**
+   * Returns the cached barycenter (centroid) of a triangle face.
    * @param {number} fIdx
-   * @return {!Array<number>}
+   * @return {!Array<number>} [x, y, z]
    */
   getFaceBarycenter (fIdx) {
     return this.#faceBarycenterCache[fIdx]
   }
 
   /**
+   * Returns the cached barycenter (centroid) of a tetrahedron.
    * @param {number} tIdx
-   * @return {!Array<number>}
+   * @return {!Array<number>} [x, y, z]
    */
   getTetrahedronBarycenter (tIdx) {
     return this.#tetBarycenterCache[tIdx]
   }
 
   /**
+   * Returns the set of tetrahedra incident on a vertex (the vertex star).
    * @param {number} vIdx
-   * @return {!Array<number>}
+   * @return {!Array<number>} Array of tetrahedron indices.
    */
   getStar (vIdx) {
     return this.vertexToTets[vIdx] || []
   }
 
   /**
+   * Returns the boundary faces incident on a vertex (the boundary star).
    * @param {number} vIdx
-   * @return {!Array<number>}
+   * @return {!Array<number>} Array of boundary face indices.
    */
   getBoundaryStar (vIdx) {
     return this.vertexToBoundaryFaces[vIdx] || []
   }
 
   /**
+   * Returns the edges incident on a vertex.
    * @param {number} vIdx
-   * @return {!Array<number>}
+   * @return {!Array<number>} Array of edge indices.
    */
   getEdgeStar (vIdx) {
     return this.vertexToEdges[vIdx] || []
   }
 
   /**
+   * Returns the cached volume of a tetrahedron.
    * @param {number} tIdx
-   * @return {number}
+   * @return {number} Volume (absolute value of signed determinant / 6).
    */
   getVolume (tIdx) {
     return this.#volumeCache[tIdx]
   }
 
   /**
+   * Returns the four global face indices of a tetrahedron in local order
+   * (opposite-vertex convention: face 0 is opposite vertex 0, etc.).
    * @param {number} tIdx
-   * @return {!Array<number>}
+   * @return {!Array<number>} Array of four face indices.
    */
   getTetrahedronFaces (tIdx) {
     const tet = this.tetrahedra[tIdx]

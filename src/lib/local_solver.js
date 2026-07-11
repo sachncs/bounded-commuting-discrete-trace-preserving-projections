@@ -6,6 +6,14 @@
 import { dot, cross, subtract, norm, zeros, luSolve, infinityNorm } from './math_utils.js'
 import { SingularMatrixError } from './errors.js'
 
+/**
+ * Static utility for assembling surface-patch stiffness matrices and solving
+ * constrained linear systems during boundary weight computation.
+ *
+ * The constraint enforcement uses a simple row-replacement approach that works
+ * well for small patch sizes (valence < 20).  For production-scale patches a
+ * Lagrange-multiplier or projected-gradient method is preferable.
+ */
 export class LocalSolver {
   /**
    * Assembles the surface stiffness matrix for -Delta_Gamma.
@@ -71,6 +79,8 @@ export class LocalSolver {
    *
    * @param {!Array<!Array<number>>} K
    * @param {!Array<number>} b
+   * @param {function=} onWarning - Callback invoked with a warning context
+   *   object when the matrix is ill-conditioned.
    * @return {!Array<number>}
    */
   static solveWithConstraint (K, b, onWarning = console.warn) {

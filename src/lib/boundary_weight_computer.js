@@ -8,10 +8,21 @@
 import { subtract, norm, triangleArea } from './math_utils.js'
 import { LocalSolver } from './local_solver.js'
 
+/**
+ * Computes boundary patch weights used by the trace-preserving projection
+ * operators.  For each boundary vertex, it assembles a surface-patch stiffness
+ * matrix on the Alfeld-split star, solves a constrained Laplace problem to
+ * obtain the weight functions psi, and collects edge tangents and face normals.
+ *
+ * Local failures (e.g. degenerate patches) emit warnings rather than throwing
+ * so that a single bad element does not halt the entire mesh projection.
+ */
 export class BoundaryWeightComputer {
   /**
    * @param {!Mesh} mesh
    * @param {!MeshRefinement} meshRefinement
+   * @param {function=} onWarning - Callback invoked with a warning context
+   *   object when a local weight computation fails or is ill-conditioned.
    */
   constructor (mesh, meshRefinement, onWarning = console.warn) {
     this.mesh = mesh

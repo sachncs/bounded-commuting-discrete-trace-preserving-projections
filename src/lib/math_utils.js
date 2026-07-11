@@ -11,18 +11,9 @@ import { SingularMatrixError } from './errors.js'
 /** @const {number} */
 const EPSILON = 1e-12
 
-/** Maximum n for which n! fits in a JavaScript Number without overflowing. */
+/** @const {number} Maximum n for which n! fits in a JavaScript Number without overflowing. */
 export const MAX_SAFE_FACTORIAL = 170
 
-/**
- * Computes the determinant (scalar triple product) of the tetrahedron with
- * vertices v0, v1, v2, v3.  The absolute value divided by 6 equals the volume.
- * @param {!Array<number>} v0
- * @param {!Array<number>} v1
- * @param {!Array<number>} v2
- * @param {!Array<number>} v3
- * @return {number}
- */
 /**
  * Computes the dot product of two 3D vectors.
  * @param {!Array<number>} a
@@ -33,6 +24,15 @@ export function dot (a, b) {
   return a[0] * b[0] + a[1] * b[1] + a[2] * b[2]
 }
 
+/**
+ * Computes the determinant (scalar triple product) of the tetrahedron with
+ * vertices v0, v1, v2, v3.  The absolute value divided by 6 equals the volume.
+ * @param {!Array<number>} v0
+ * @param {!Array<number>} v1
+ * @param {!Array<number>} v2
+ * @param {!Array<number>} v3
+ * @return {number}
+ */
 export function tetDeterminant (v0, v1, v2, v3) {
   const e0 = [v1[0] - v0[0], v1[1] - v0[1], v1[2] - v0[2]]
   const e1 = [v2[0] - v0[0], v2[1] - v0[1], v2[2] - v0[2]]

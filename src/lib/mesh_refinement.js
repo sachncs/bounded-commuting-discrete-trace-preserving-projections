@@ -1,12 +1,13 @@
 /**
- * Mesh refinement operators: Alfeld face splitting and Worsey-Farin tetrahedron
- * splitting.
+ * Mesh refinement operators implementing Alfeld face splitting (Section 6.1.3)
+ * and Worsey-Farin tetrahedron splitting (Section 6.1.4).
  *
  * This class mutates the underlying Mesh by appending barycenter vertices.
  * It stores the refinement data (sub-triangles, sub-tetrahedra) separately so
  * that Mesh remains a pure data structure.
+ *
+ * Both splits are idempotent: calling them more than once is a no-op.
  */
-
 export class MeshRefinement {
   /** @type {boolean} */
   #alfeldDone

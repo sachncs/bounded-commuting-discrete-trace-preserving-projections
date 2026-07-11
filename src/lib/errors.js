@@ -21,6 +21,9 @@ export class MeshValidationError extends Error {
  * Thrown when a projection cannot be computed.
  */
 export class ProjectionError extends Error {
+  /**
+   * @param {string} message - Description of the projection failure.
+   */
   constructor (message) {
     super(message)
     this.name = 'ProjectionError'
@@ -31,6 +34,9 @@ export class ProjectionError extends Error {
  * Thrown when a linear system is singular or numerically ill-conditioned.
  */
 export class SingularMatrixError extends Error {
+  /**
+   * @param {string} message - Description of the singularity condition.
+   */
   constructor (message) {
     super(message)
     this.name = 'SingularMatrixError'

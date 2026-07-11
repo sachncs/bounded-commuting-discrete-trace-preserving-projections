@@ -4,6 +4,14 @@
  * Recursively partitions the mesh bounding box to achieve O(log N) search.
  */
 
+/**
+ * Axis-aligned bounding box (AABB) tree for O(log N) point-in-tetrahedron
+ * queries.
+ *
+ * The tree is built by recursively splitting tetrahedra along the longest
+ * axis at the median centroid, guaranteeing a balanced tree.  Leaf nodes
+ * store up to maxLeafSize tetrahedra and are tested exhaustively.
+ */
 export class PointLocator {
   /**
    * @param {!Mesh} mesh

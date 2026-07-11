@@ -12,11 +12,25 @@ import {
   compositeTetrahedronQuadrature
 } from './quadrature.js'
 
+/**
+ * Higher-order projection framework implementing Section 7 of the paper.
+ *
+ * For polynomial degree p >= 4 on H^1 (l=0), the projection Pi^l_p is built
+ * from the lowest-order projection by adding bubble corrections on
+ * Alfeld-split patches.  For L2 (l=3) with p >= 1, a Bernstein-basis
+ * L2 projection is used instead.
+ *
+ * For p = 1, 2, 3 on H^1 the bubble space is empty (the product
+ * b = lambda_0 * lambda_1 * lambda_2 * lambda_3 already has degree 4),
+ * so projectHp returns the lowest-order projection without enrichment.
+ */
 export class HigherOrderProjection {
   /**
    * @param {!Mesh} mesh
    * @param {!Whitney} whitney
    * @param {number=} quadratureOrder
+   * @param {function=} onWarning - Callback invoked with a warning context
+   *   object when a local solve fails (e.g. singular mass matrix).
    */
   constructor (mesh, whitney, quadratureOrder = 3, onWarning = console.warn) {
     this.mesh = mesh
