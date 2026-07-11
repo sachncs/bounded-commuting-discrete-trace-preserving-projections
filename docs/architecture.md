@@ -14,6 +14,8 @@ src/lib/
   higher_order_projection.js  — Bubble basis assembly, L2 monomial projection
   boundary_weight_computer.js — Alfeld/Worsey-Farin split + weight solves
   mesh_refinement.js          — Alfeld and Worsey-Farin mesh splits
+  convergence_harness.js      — Convergence experiment utilities (dev/test)
+  mesh_generator.js           — Structured cube mesh generator (dev/test)
   errors.js                   — Custom error classes
   projectors/
     h1_projector.js           — Pi^0 (vertex-based)

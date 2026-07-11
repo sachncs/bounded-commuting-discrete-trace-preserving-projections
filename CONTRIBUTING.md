@@ -75,6 +75,10 @@ Optional scope should reference the module affected:
 - `math-utils` - Linear algebra primitives
 - `local-solver` - Boundary-patch assembly
 - `higher-order` - Higher-order projection
+- `boundary-weight` - Boundary weight computation
+- `mesh-refinement` - Alfeld and Worsey-Farin splits
+- `errors` - Custom error classes
+- `projectors` - H1, Hcurl, Hdiv, L2 projectors
 - `docs` - Documentation
 
 ## Pull Request Process

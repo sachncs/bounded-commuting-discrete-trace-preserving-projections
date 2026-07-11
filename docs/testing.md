@@ -14,10 +14,10 @@ This project maintains high test coverage (currently >98% statements, >93% branc
 | `interior_extension.test.js` | Ring projector, extension operator, decomposition properties |
 | `local_solver.test.js` | Surface stiffness assembly, constrained solves |
 | `math_utils.test.js` | Vector operations, LU solver, matrix inversion |
-| `mesh.test.js` | Mesh topology, volume, boundary stars |
+| `Mesh.test.js` | Mesh topology, volume, boundary stars |
 | `point_locator.test.js` | AABB tree point-in-tet queries |
-| `quadrature.test.js` | Gaussian quadrature exactness |
-| `whitney.test.js` | Barycentric coordinates, Whitney basis functions |
+| `Quadrature.test.js` | Gaussian quadrature exactness |
+| `Whitney.test.js` | Barycentric coordinates, Whitney basis functions |
 
 ## Running Tests
 
