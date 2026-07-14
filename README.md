@@ -3,10 +3,10 @@
   <p align="center">Bounded, Commuting, Discrete-trace Preserving Projections for the 3D de Rham complex on simplicial meshes.</p>
   <p align="center">
     <a href="#installation"><img src="https://img.shields.io/npm/v/bcdtpp.svg" alt="npm version"></a>
-    <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-green" alt="License"></a>
+    <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-green" alt="License"></a>
     <a href="https://github.com/sachncs/bounded-commuting-discrete-trace-preserving-projections/actions"><img src="https://img.shields.io/github/actions/workflow/status/sachncs/bounded-commuting-discrete-trace-preserving-projections/ci.yml?branch=master" alt="CI"></a>
-    <a href="https://www.npmjs.com/package/bcdtpp"><img src="https://img.shields.io/npm/dm/bcdtpp" alt="Downloads"></a>
-    <a href="https://standardjs.com"><img src="https://img.shields.io/badge/code_style-standard-brightgreen" alt="StandardJS"></a>
+    <a href="https://www.npmjs.com/package/bcdtpp"><img src="https://img.shields.io/npm/v/bcdtpp" alt="npm"></a>
+    <a href="https://github.com/sachncs/bounded-commuting-discrete-trace-preserving-projections/stargazers"><img src="https://img.shields.io/github/stars/sachncs/bounded-commuting-discrete-trace-preserving-projections" alt="Stars"></a>
   </p>
 </p>
 
@@ -14,23 +14,7 @@ Based on the paper: [*Ern, Guzmán, Potu (2026) arXiv:2604.28103v1*](https://arx
 
 > **Disclaimer:** I am not an author of the paper above. This repository is an independent JavaScript implementation of the algorithm described in that work.
 
-## Table of Contents
-
-- [Features](#features)
-- [Installation](#installation)
-- [Usage](#usage)
-- [API Overview](#api-overview)
-- [Error Handling](#error-handling)
-- [TypeScript](#typescript)
-- [Browser Usage](#browser-usage)
-- [Performance](#performance)
-- [Development](#development)
-- [Project Structure](#project-structure)
-- [Mathematical Background](#mathematical-background)
-- [What's Next](#whats-next)
-- [Changelog](#changelog)
-- [Contributing](#contributing)
-- [License](#license)
+---
 
 ## Features
 
@@ -48,7 +32,11 @@ Based on the paper: [*Ern, Guzmán, Potu (2026) arXiv:2604.28103v1*](https://arx
 - **Commuting Properties**: Designed to commute with exterior derivatives while preserving discrete traces.
 - **Fast Point Location**: AABB tree for `O(log N)` point-in-tetrahedron queries.
 
+---
+
 ## Installation
+
+### From npm
 
 ```bash
 npm install bcdtpp
@@ -62,7 +50,9 @@ cd bounded-commuting-discrete-trace-preserving-projections
 npm install
 ```
 
-## Usage
+---
+
+## Quick Start
 
 ### 1. Define a Mesh
 
@@ -105,20 +95,74 @@ const result = bcdtpp.projectAtPoint(u, [0.1, 0.2, 0.3], /* l */ 0, /* p */ 0)
 // result = { value, tIdx, bary }
 ```
 
-## API Overview
+---
 
-The package exports the following named entities:
+## Configuration
 
-| Export | Subpath | Description |
-|--------|---------|-------------|
-| `Bcdtpp` | `bcdtpp` | Main projection orchestrator |
-| `Mesh` | `bcdtpp/mesh` | Tetrahedral mesh topology and geometry |
-| `Whitney` | `bcdtpp/whitney` | Barycentric coordinates and Whitney basis |
-| `PointLocator` | `bcdtpp/point-locator` | AABB tree point-in-tet locator |
-| `quadrature` | `bcdtpp/quadrature` | Gaussian quadrature utilities |
-| `mathUtils` | `bcdtpp/math-utils` | Linear algebra primitives |
+| Setting | Constructor option | Default | Description |
+|---------|---------------------|---------|-------------|
+| Quadrature order | `quadratureOrder` | `3` | Gaussian quadrature order for local solvers |
+| Boundary split | `boundarySplit` | `"alfeld"` | `"alfeld"` or `"worsey-farin"` |
+| Refresh on change | `autoRefresh` | `false` | Recompute weights when mesh changes |
+| Verbose logging | `verbose` | `false` | Enable progress / diagnostic logging |
+| AABB tree leaf size | `aabbLeafSize` | `8` | Maximum tetrahedra per AABB leaf |
 
-All subpaths are exposed via the `exports` field in `package.json` and include hand-written `.d.ts` files.
+---
+
+## API
+
+| Symbol | Type | Description |
+|--------|------|-------------|
+| `Bcdtpp` | class | Main projection orchestrator |
+| `Mesh` | class | Tetrahedral mesh topology and geometry |
+| `Whitney` | class | Barycentric coordinates and Whitney basis |
+| `PointLocator` | class | AABB tree point-in-tet locator |
+| `quadrature` | module | Gaussian quadrature utilities |
+| `mathUtils` | module | Linear algebra primitives |
+| `projectH1` | method | `Pi^0` (vertex-based) projection |
+| `projectHcurl` | method | `Pi^1` (edge-based) projection |
+| `projectHdiv` | method | `Pi^2` (face-based) projection |
+| `projectL2` | method | `Pi^3` (cell-based) projection |
+| `projectHp` | method | Higher-order scalar projection (`p >= 1`) |
+| `projectAtPoint` | method | Project at an arbitrary point with point location |
+
+All subpaths are exposed via the `exports` field in `package.json` and
+include hand-written `.d.ts` files.
+
+---
+
+## Examples
+
+### Project a function on a unit cube mesh
+
+```javascript
+import { Mesh, Whitney, Bcdtpp } from 'bcdtpp'
+
+const cube = unitCubeTetrahedralMesh(8, 8, 8)
+const mesh = new Mesh(cube.vertices, cube.tets)
+const whitney = new Whitney(mesh)
+const bcdtpp = new Bcdtpp(mesh, whitney, { quadratureOrder: 3 })
+
+bcdtpp.computeBoundaryWeights()
+bcdtpp.buildPointLocator()
+
+const f = (p) => Math.sin(p[0]) * Math.cos(p[1]) * Math.exp(p[2])
+const val = bcdtpp.projectH1(f, [0.25, 0.5, 0.5], 0)
+console.log(val)
+```
+
+### Inspect projection result
+
+```javascript
+const result = bcdtpp.projectAtPoint(f, [0.5, 0.5, 0.5], 0, 0)
+console.log({
+  value: result.value,
+  tetIndex: result.tIdx,
+  barycentric: result.bary,
+})
+```
+
+---
 
 ## Error Handling
 
@@ -129,6 +173,8 @@ The library throws specific error subclasses so callers can distinguish mesh pro
 - `SingularMatrixError` — Numerical linear algebra failure (singular Jacobian, zero pivot).
 
 Recoverable boundary-weight failures emit warnings rather than throwing, so a single bad element does not halt the entire mesh projection. See [docs/exceptions.md](docs/exceptions.md) for the full taxonomy.
+
+---
 
 ## TypeScript
 
@@ -142,6 +188,8 @@ Hand-written `.d.ts` declaration files are co-located with every source module i
 }
 ```
 
+---
+
 ## Browser Usage
 
 The UMD bundle is available via CDN:
@@ -153,6 +201,22 @@ The UMD bundle is available via CDN:
 </script>
 ```
 
+---
+
+## Mathematical Background
+
+This library implements the construction of boundary correction operators `Pi_partial^l`. The final projection is defined as:
+
+```
+Pi^l = Pi_partial^l + Pi_ring^l (I - Pi_partial^l)
+```
+
+The novel contribution of the paper is the construction of `Pi_partial^l` using local problems on subdivided patches to ensure stability and trace-preservation.
+
+See [docs/math.md](docs/math.md) for the full mathematical exposition (de Rham complex, Whitney forms, commuting diagrams, and mesh refinement theory).
+
+---
+
 ## Performance
 
 - **Mesh construction**: `O(V + T)` where `V` is vertices and `T` is tetrahedra.
@@ -160,30 +224,7 @@ The UMD bundle is available via CDN:
 - **Boundary weight computation**: `O(V * k)` where `k` is the typical boundary-patch size; this is the dominant upfront cost.
 - **Per-element projection**: `O(1)` for lowest-order; `O(p^3)` for higher-order scalar enrichment.
 
-## Tech Stack
-
-| Category | Technology |
-|----------|------------|
-| Language | JavaScript (ES2022) |
-| Build | [Rollup](https://rollupjs.org/) (ESM + CJS + UMD) |
-| Lint | [StandardJS](https://standardjs.com/) |
-| Testing | [Mocha](https://mochajs.org/) + [Chai](https://www.chaijs.com/) |
-| Coverage | [c8](https://github.com/bcoe/c8) |
-| CI | [GitHub Actions](https://github.com/features/actions) |
-
-## Development
-
-This project uses a zero-config toolchain. Every task is a single `npm run` command away.
-
-| Script | Purpose |
-|--------|---------|
-| `npm run lint` | Check StandardJS style |
-| `npm run lint:fix` | Auto-fix StandardJS violations |
-| `npm test` | Run the full Mocha test suite |
-| `npm run test:watch` | Run tests in watch mode |
-| `npm run test:coverage` | Run tests with c8 coverage |
-| `npm run build` | Build ESM, CJS, and UMD bundles |
-| `npm run docs` | Regenerate API docs from JSDoc |
+---
 
 ## Project Structure
 
@@ -221,22 +262,77 @@ docs/
   publishing.md              — Versioning and release process
 ```
 
-## Mathematical Background
+---
 
-This library implements the construction of boundary correction operators `Pi_partial^l`.
-The final projection is defined as:
+## Development
+
+```bash
+npm install                  # Install dev dependencies
+npm run lint                 # StandardJS style check
+npm run lint:fix             # Auto-fix StandardJS violations
+npm test                     # Run the full Mocha test suite
+npm run test:watch           # Run tests in watch mode
+npm run test:coverage        # Run tests with c8 coverage
+npm run build                # Build ESM, CJS, and UMD bundles
+npm run docs                 # Regenerate API docs from JSDoc
+```
+
+### Commit Conventions
+
+We use [Conventional Commits](https://www.conventionalcommits.org/):
 
 ```
-Pi^l = Pi_partial^l + Pi_ring^l (I - Pi_partial^l)
+feat: add Alfeld split boundary weight computation
+fix: clamp barycentric coordinates to [0,1]
+docs: regenerate API reference from JSDoc
+refactor: extract AABB tree to dedicated module
+test: add fixtures for Worsey-Farin splits
+chore: bump rollup to 4.x
 ```
 
-The novel contribution of the paper is the construction of `Pi_partial^l` using local problems on subdivided patches to ensure stability and trace-preservation.
+---
 
-See [docs/math.md](docs/math.md) for the full mathematical exposition (de Rham complex, Whitney forms, commuting diagrams, and mesh refinement theory).
+## Testing
 
-## What's Next
+```bash
+npm test                     # Mocha test suite
+npm run test:coverage        # With c8 coverage report
+```
 
-The following items are planned but not yet implemented. Contributions are welcome.
+---
+
+## Build
+
+```bash
+npm run build                # ESM + CJS + UMD bundles
+npm run build:full           # Build + regenerate API docs
+```
+
+---
+
+## Release
+
+1. Bump version in `package.json`
+2. Update `CHANGELOG.md`
+3. Commit with a `version:X.Y.Z` message
+4. Tag and push — CI publishes to npm
+
+---
+
+## Tech Stack
+
+| Category | Technology |
+|----------|------------|
+| Language | JavaScript (ES2022) |
+| Build | [Rollup](https://rollupjs.org/) (ESM + CJS + UMD) |
+| Lint | [StandardJS](https://standardjs.com/) |
+| Testing | [Mocha](https://mochajs.org/) + [Chai](https://www.chaijs.com/) |
+| Coverage | [c8](https://github.com/bcoe/c8) |
+| CI | [GitHub Actions](https://github.com/features/actions) |
+
+---
+
+## Roadmap
 
 ### High Priority
 
@@ -254,13 +350,12 @@ The following items are planned but not yet implemented. Contributions are welco
 - **Time-dependent projections**: Cache-friendly APIs for projecting fields that evolve between time steps.
 - **Arbitrary polynomial degree `p`**: Unify the scalar bubble and L2 monomial bases into a single hierarchical basis generator.
 
-## Changelog
-
-See [CHANGELOG.md](CHANGELOG.md) for a detailed history of releases and breaking changes.
+---
 
 ## Contributing
 
-Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
+Please read [CONTRIBUTING.md](CONTRIBUTING.md) for details on our code
+of conduct and the process for submitting pull requests.
 
 ## Code of Conduct
 
